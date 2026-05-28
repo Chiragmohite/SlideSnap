@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>VidToDoc — YouTube to Study Notes</title>
+<title>SlideSnap — YouTube to Study Notes</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -31,7 +31,6 @@
     padding: 56px 20px 100px;
   }
 
-  /* ── Header ── */
   .logo {
     display: flex; align-items: center; gap: 14px;
     margin-bottom: 12px;
@@ -51,7 +50,6 @@
     line-height: 1.5; max-width: 520px;
   }
 
-  /* ── Card ── */
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -94,7 +92,6 @@
   .btn:active { transform: scale(.97); }
   .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
 
-  /* ── Pills ── */
   .pills { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
   .pill {
     font-size: 14px; color: var(--muted);
@@ -104,7 +101,6 @@
     padding: 7px 14px;
   }
 
-  /* ── Progress ── */
   .progress-wrap { margin-top: 32px; display: none; }
   .progress-header {
     display: flex; justify-content: space-between; align-items: center;
@@ -137,7 +133,6 @@
   .step-item.active .step-dot { background: var(--accent); }
   .step-item.done   .step-dot { background: var(--success); }
 
-  /* ── Result ── */
   .result-wrap {
     margin-top: 32px;
     background: var(--bg);
@@ -163,7 +158,6 @@
   }
   .btn-dl:hover { opacity: .85; }
 
-  /* ── Error ── */
   .error-box {
     margin-top: 20px; display: none;
     background: rgba(248,113,113,.08);
@@ -172,7 +166,6 @@
     font-size: 16px; color: var(--error); line-height: 1.6;
   }
 
-  /* ── How it works ── */
   .how { margin-top: 52px; max-width: 620px; width: 100%; }
   .how-title {
     font-size: 15px; font-weight: 700; color: var(--muted);
@@ -193,16 +186,16 @@
 <body>
 
 <div class="logo">
-  <div class="logo-icon">📄</div>
-  <span class="logo-text">VidToDoc</span>
+  <div class="logo-icon">📸</div>
+  <span class="logo-text">SlideSnap</span>
 </div>
-<p class="tagline">Turn any educational YouTube video into a clean, downloadable study PDF</p>
+<p class="tagline">Snap the slides from any YouTube lecture — get a clean, downloadable study PDF</p>
 
 <div class="card">
   <label class="input-label" for="url-input">YouTube Video URL</label>
   <div class="input-row">
     <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=..." />
-    <button class="btn" id="btn-go" onclick="startJob()">Convert →</button>
+    <button class="btn" id="btn-go" onclick="startJob()">Snap it →</button>
   </div>
 
   <div class="pills">
@@ -244,7 +237,7 @@
     </div>
     <div class="how-item">
       <div class="how-num">2</div>
-      <div class="how-desc">AI scans every slide and reads the text</div>
+      <div class="how-desc">AI snaps every slide and reads the text</div>
     </div>
     <div class="how-item">
       <div class="how-num">3</div>
@@ -274,7 +267,7 @@ function showError(msg) {
   $("error-box").style.display = "block";
   $("progress-wrap").style.display = "none";
   $("btn-go").disabled = false;
-  $("btn-go").textContent = "Convert →";
+  $("btn-go").textContent = "Snap it →";
 }
 
 function setProgress(step, pct) {
@@ -299,7 +292,7 @@ async function startJob() {
   $("result-wrap").style.display = "none";
   $("progress-wrap").style.display = "block";
   $("btn-go").disabled = true;
-  $("btn-go").textContent = "Working…";
+  $("btn-go").textContent = "Snapping…";
   setProgress("Starting…", 0);
 
   if (pollTimer) clearInterval(pollTimer);
@@ -337,7 +330,7 @@ async function pollStatus() {
       $("result-title").textContent = job.filename.replace(/_/g, " ").replace(".pdf", "");
       $("result-meta").textContent = "PDF ready — click to download";
       $("btn-go").disabled = false;
-      $("btn-go").textContent = "Convert →";
+      $("btn-go").textContent = "Snap it →";
       $("btn-dl").onclick = () => { window.location.href = `/api/download/${currentJobId}`; };
     } else {
       showError(job.error || "Something went wrong.");

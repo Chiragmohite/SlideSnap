@@ -1,8 +1,8 @@
-# 📄 SlideSnap
+# 📸 SlideSnap
 
-**Turn any educational YouTube video into a clean, downloadable study PDF — powered by AI.**
+**Snap the slides from any YouTube lecture — get a clean, downloadable study PDF.**
 
-VidToDoc extracts slide frames from YouTube videos, reads the text using vision AI, and generates a well-formatted PDF with questions and notes organized by module/topic.
+SlideSnap extracts slide frames from YouTube videos, reads the text using vision AI, and generates a well-formatted PDF with questions and notes organized by module/topic.
 
 ---
 
@@ -17,11 +17,9 @@ VidToDoc extracts slide frames from YouTube videos, reads the text using vision 
 
 ---
 
-## 🖥️ Demo
+## 🖥️ Screenshot
 
-> Paste a YouTube video URL → AI scans the slides → Download your PDF
-
-![VidToDoc UI](https://raw.githubusercontent.com/Chiragmohite/VidToDoc/main/screenshot.png)
+![SlideSnap UI](https://raw.githubusercontent.com/Chiragmohite/SlideSnap/main/Screenshot.png.png)
 
 ---
 
@@ -37,8 +35,8 @@ VidToDoc extracts slide frames from YouTube videos, reads the text using vision 
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Chiragmohite/VidToDoc.git
-cd VidToDoc
+git clone https://github.com/Chiragmohite/SlideSnap.git
+cd SlideSnap
 
 # 2. Install dependencies
 pip install -r backend/requirements.txt
@@ -82,7 +80,7 @@ Download ✅
 ## 📁 Project Structure
 
 ```
-VidToDoc/
+SlideSnap/
 ├── index.html          # Frontend UI
 ├── start.bat           # Windows quick-start script
 ├── backend/
@@ -97,22 +95,19 @@ VidToDoc/
 
 ## ⚙️ Configuration
 
-| Variable | Description |
-|---|---|
-| `GROQ_API_KEY` | Your Groq API key from console.groq.com |
-
-Set it in `backend/.env`:
+Set your Groq API key in `backend/.env`:
 ```
 GROQ_API_KEY=your_key_here
 ```
+
+Get a free key at [console.groq.com](https://console.groq.com)
 
 ---
 
 ## ⚠️ Notes
 
-- Processing takes **3–5 minutes** depending on video length (due to Groq free tier rate limits)
+- Processing takes **3–5 minutes** depending on video length (Groq free tier rate limits)
 - Works best with slide-based or text-heavy educational videos
-- Auto-captions/transcript videos may have lower accuracy for handwritten content
 - Groq free tier: 500k tokens/day — enough for ~10 videos per day
 
 ---

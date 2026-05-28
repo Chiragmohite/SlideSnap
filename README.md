@@ -4,6 +4,7 @@
 
 SlideSnap extracts slide frames from YouTube videos, reads the text using vision AI, and generates a well-formatted PDF with questions and notes organized by module/topic.
 
+Try it out : https://ching-nonprofit-underhandedly.ngrok-free.dev
 ---
 
 ## ✨ Features

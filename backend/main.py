@@ -272,7 +272,8 @@ def build_pdf(url: str, title: str, text: str, out_path: Path) -> None:
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     doc = SimpleDocTemplate(str(out_path), pagesize=A4,
-        leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm)
+    leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm,
+    title=title, author="SlideSnap", subject="Study Notes")
     story = [
         Paragraph(esc(title), title_style),
         Paragraph(esc(f"Source: {url}"), meta_style),

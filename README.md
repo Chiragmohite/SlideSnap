@@ -1,4 +1,4 @@
-# 📄 VidToDoc
+# 📄 SlideSnap
 
 **Turn any educational YouTube video into a clean, downloadable study PDF — powered by AI.**
 

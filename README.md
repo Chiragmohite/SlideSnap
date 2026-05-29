@@ -32,7 +32,7 @@ SlideSnap extracts slide frames from YouTube videos, reads the text using vision
 - [FFmpeg](https://www.ffmpeg.org/download.html) — install via: `winget install Gyan.FFmpeg`
 - A free [Groq API key](https://console.groq.com) (uses `llama-4-scout` vision model)
 
-### Installation
+### Installations
 
 ```bash
 # 1. Clone the repo

@@ -13,7 +13,11 @@ pinned: false
 
 SlideSnap extracts slide frames from YouTube videos, reads the text using vision AI, and generates a well-formatted PDF with questions and notes organized by module/topic.
 
-> 🔗 **Try it out:** https://ching-nonprofit-underhandedly.ngrok-free.dev
+[![Live Demo](https://img.shields.io/badge/🤗%20Live%20Demo-HuggingFace-blue)](https://chiragmohite-slidesnap.hf.space)
+[![GitHub](https://img.shields.io/badge/GitHub-SlideSnap-black?logo=github)](https://github.com/Chiragmohite/SlideSnap)
+
+> 🔗 **Try it out:** https://chiragmohite-slidesnap.hf.space
+
 ---
 
 ## ✨ Features
@@ -41,7 +45,7 @@ SlideSnap extracts slide frames from YouTube videos, reads the text using vision
 - [FFmpeg](https://www.ffmpeg.org/download.html) — install via: `winget install Gyan.FFmpeg`
 - A free [Groq API key](https://console.groq.com) (uses `llama-4-scout` vision model)
 
-### Installations
+### Installation
 
 ```bash
 # 1. Clone the repo
@@ -91,6 +95,7 @@ Download ✅
 
 ```
 SlideSnap/
+├── Dockerfile          # For deployment
 ├── index.html          # Frontend UI
 ├── start.bat           # Windows quick-start script
 ├── backend/
@@ -106,6 +111,7 @@ SlideSnap/
 ## ⚙️ Configuration
 
 Set your Groq API key in `backend/.env`:
+
 ```
 GROQ_API_KEY=your_key_here
 ```

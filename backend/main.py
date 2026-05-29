@@ -51,21 +51,12 @@ def resolve_tool(name: str) -> list[str]:
     if found:
         _TOOL_CACHE[name] = [found]
         return _TOOL_CACHE[name]
-    if name == "ffmpeg" and os.name == "nt":
-        local = os.environ.get("LOCALAPPDATA", "")
-        patterns = [
-            r"C:\Users\Chirag M\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.1-full_build\bin\ffmpeg.exe",
-            os.path.join(local, "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg_*", "ffmpeg-*", "bin", "ffmpeg.exe"),
-            r"C:\ffmpeg\bin\ffmpeg.exe",
-            os.path.join(os.environ.get("ProgramFiles", ""), "ffmpeg", "bin", "ffmpeg.exe"),
-        ]
-        for pattern in patterns:
-            for match in sorted(glob.glob(pattern), reverse=True):
-                if os.path.isfile(match):
-                    _TOOL_CACHE[name] = [match]
-                    return _TOOL_CACHE[name]
+    # yt-dlp fallback: try running as a Python module
     if name == "yt-dlp":
-        for cmd in ([sys.executable, "-m", "yt_dlp"], ["py", "-3.12", "-m", "yt_dlp"], ["py", "-3", "-m", "yt_dlp"]):
+        for cmd in (
+            [sys.executable, "-m", "yt_dlp"],
+            ["py", "-3", "-m", "yt_dlp"],
+        ):
             try:
                 proc = subprocess.run([*cmd, "--version"], capture_output=True, timeout=15)
                 if proc.returncode == 0:
@@ -73,9 +64,7 @@ def resolve_tool(name: str) -> list[str]:
                     return _TOOL_CACHE[name]
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 continue
-    hint = "Install ffmpeg: winget install Gyan.FFmpeg  then restart the server."
-    if name == "yt-dlp":
-        hint = "Install: pip install yt-dlp"
+    hint = "Install ffmpeg via nixpacks or apt." if name == "ffmpeg" else "Install: pip install yt-dlp"
     raise HTTPException(status_code=500, detail=f"'{name}' not found. {hint}")
 
 def tool_cmd(name: str) -> list[str]:
@@ -106,8 +95,7 @@ async def fetch_video_title(url: str, video_id: str) -> str:
     return video_id
 
 def get_video_duration(video: Path) -> float:
-    ffmpeg_path = tool_cmd("ffmpeg")[0]
-    ffprobe_path = ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe").replace("ffmpeg", "ffprobe")
+    ffprobe_path = shutil.which("ffprobe") or "ffprobe"
     try:
         proc = subprocess.run(
             [ffprobe_path, "-v", "error", "-show_entries", "format=duration",
@@ -397,4 +385,5 @@ async def download(job_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

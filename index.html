@@ -6,7 +6,6 @@
 <title>SlideSnap — YouTube to Study Notes</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
     --bg:      #0f1117;
     --surface: #1a1d27;
@@ -19,168 +18,130 @@
     --error:   #f87171;
     --radius:  14px;
   }
-
   body {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg); color: var(--text);
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 56px 20px 100px;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 56px 20px 100px;
   }
-
-  .logo {
-    display: flex; align-items: center; gap: 14px;
-    margin-bottom: 12px;
-  }
+  .logo { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
   .logo-icon {
     width: 56px; height: 56px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
+    border-radius: 14px; display: flex; align-items: center; justify-content: center;
     font-size: 28px;
   }
   .logo-text { font-size: 40px; font-weight: 800; letter-spacing: -1px; }
+  .tagline { font-size: 20px; color: var(--muted); margin-bottom: 48px; text-align: center; line-height: 1.5; max-width: 520px; }
 
-  .tagline {
-    font-size: 20px; color: var(--muted);
-    margin-bottom: 48px; text-align: center;
-    line-height: 1.5; max-width: 520px;
-  }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px; width: 100%; max-width: 620px; }
 
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 36px;
-    width: 100%; max-width: 620px;
+  /* Mode tabs */
+  .mode-tabs { display: flex; gap: 0; margin-bottom: 28px; background: var(--bg); border-radius: 10px; padding: 4px; }
+  .mode-tab {
+    flex: 1; padding: 10px; text-align: center; font-size: 15px; font-weight: 600;
+    color: var(--muted); cursor: pointer; border-radius: 8px; transition: all .2s;
   }
+  .mode-tab.active { background: var(--accent); color: #fff; }
 
-  .input-label {
-    font-size: 18px; font-weight: 600; color: var(--muted);
-    margin-bottom: 12px; display: block;
-  }
+  /* URL mode */
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+
+  .input-label { font-size: 18px; font-weight: 600; color: var(--muted); margin-bottom: 12px; display: block; }
   .input-row { display: flex; gap: 10px; }
-
-  input[type="url"] {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 15px 18px;
-    color: var(--text);
-    font-size: 17px;
-    outline: none;
-    transition: border-color .2s;
+  input[type="url"], input[type="text"] {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 15px 18px; color: var(--text);
+    font-size: 17px; outline: none; transition: border-color .2s;
   }
-  input[type="url"]:focus { border-color: var(--accent); }
-  input[type="url"]::placeholder { color: var(--muted); font-size: 16px; }
+  input[type="url"]:focus, input[type="text"]:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); font-size: 16px; }
 
-  .btn {
-    background: var(--accent);
-    color: #fff; border: none;
-    border-radius: 10px;
-    padding: 15px 26px;
-    font-size: 17px; font-weight: 700;
-    cursor: pointer;
-    transition: opacity .2s, transform .1s;
-    white-space: nowrap;
+  /* Upload mode */
+  .upload-area {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 40px 20px; text-align: center; cursor: pointer;
+    transition: all .2s; position: relative;
   }
+  .upload-area:hover, .upload-area.dragover { border-color: var(--accent); background: rgba(108,99,255,0.05); }
+  .upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 40px; margin-bottom: 12px; }
+  .upload-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .upload-sub { font-size: 14px; color: var(--muted); }
+  .upload-selected {
+    margin-top: 16px; padding: 12px 16px;
+    background: rgba(108,99,255,0.1); border: 1px solid rgba(108,99,255,0.3);
+    border-radius: 8px; font-size: 15px; color: var(--accent2);
+    display: none;
+  }
+  .upload-selected.visible { display: block; }
+
+  /* Time range */
+  .time-range-toggle { margin-top: 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .time-range-toggle input[type="checkbox"] { display: none; }
+  .toggle-track { width: 40px; height: 22px; background: var(--border); border-radius: 100px; position: relative; transition: background .2s; flex-shrink: 0; }
+  .toggle-track::after { content: ''; width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform .2s; }
+  .time-range-toggle.on .toggle-track { background: var(--accent); }
+  .time-range-toggle.on .toggle-track::after { transform: translateX(18px); }
+  .toggle-label { font-size: 15px; color: var(--muted); }
+  .toggle-label span { color: var(--accent2); font-weight: 600; }
+  .time-inputs { display: none; gap: 12px; margin-top: 14px; align-items: center; }
+  .time-inputs.visible { display: flex; }
+  .time-input-wrap { flex: 1; }
+  .time-sublabel { font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block; }
+  .time-inputs input[type="text"] { text-align: center; font-size: 18px; font-weight: 600; letter-spacing: 2px; padding: 12px 10px; }
+  .time-sep { color: var(--muted); font-size: 20px; margin-top: 20px; }
+  .time-hint { font-size: 13px; color: var(--muted); margin-top: 10px; padding: 10px 14px; background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.2); border-radius: 8px; line-height: 1.5; }
+  .time-hint strong { color: var(--accent2); }
+
+  .btn { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 15px 26px; font-size: 17px; font-weight: 700; cursor: pointer; transition: opacity .2s, transform .1s; white-space: nowrap; }
   .btn:hover { opacity: .88; }
   .btn:active { transform: scale(.97); }
   .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-full { width: 100%; margin-top: 20px; }
 
   .pills { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
-  .pill {
-    font-size: 14px; color: var(--muted);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 7px 14px;
-  }
+  .pill { font-size: 14px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 100px; padding: 7px 14px; }
 
   .progress-wrap { margin-top: 32px; display: none; }
-  .progress-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 12px;
-  }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .progress-step { font-size: 17px; color: var(--text); font-weight: 500; }
-  .progress-pct  { font-size: 17px; font-weight: 700; color: var(--accent2); }
-  .progress-bar-bg {
-    height: 8px; background: var(--border); border-radius: 100px; overflow: hidden;
-  }
-  .progress-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-radius: 100px;
-    transition: width .5s ease;
-    width: 0%;
-  }
-
+  .progress-pct { font-size: 17px; font-weight: 700; color: var(--accent2); }
+  .progress-bar-bg { height: 8px; background: var(--border); border-radius: 100px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 100px; transition: width .5s ease; width: 0%; }
   .steps { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
-  .step-item {
-    display: flex; align-items: center; gap: 14px;
-    font-size: 16px; color: var(--muted);
-  }
+  .step-item { display: flex; align-items: center; gap: 14px; font-size: 16px; color: var(--muted); }
   .step-item.active { color: var(--text); font-weight: 600; }
-  .step-item.done   { color: var(--success); }
-  .step-dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--border); flex-shrink: 0;
-  }
+  .step-item.done { color: var(--success); }
+  .step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
   .step-item.active .step-dot { background: var(--accent); }
-  .step-item.done   .step-dot { background: var(--success); }
+  .step-item.done .step-dot { background: var(--success); }
 
-  .result-wrap {
-    margin-top: 32px;
-    background: var(--bg);
-    border: 1px solid var(--success);
-    border-radius: 12px;
-    padding: 22px 24px;
-    display: none;
-    align-items: center; gap: 18px;
-  }
+  .result-wrap { margin-top: 32px; background: var(--bg); border: 1px solid var(--success); border-radius: 12px; padding: 22px 24px; display: none; align-items: center; gap: 18px; }
   .result-icon { font-size: 36px; flex-shrink: 0; }
   .result-info { flex: 1; min-width: 0; }
-  .result-title {
-    font-size: 18px; font-weight: 700;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
+  .result-title { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .result-meta { font-size: 15px; color: var(--muted); margin-top: 4px; }
-  .btn-dl {
-    background: var(--success); color: #000;
-    border: none; border-radius: 10px;
-    padding: 13px 20px; font-size: 16px; font-weight: 700;
-    cursor: pointer; white-space: nowrap; flex-shrink: 0;
-    transition: opacity .2s;
-  }
+  .btn-dl { background: var(--success); color: #000; border: none; border-radius: 10px; padding: 13px 20px; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity .2s; }
   .btn-dl:hover { opacity: .85; }
 
-  .error-box {
-    margin-top: 20px; display: none;
-    background: rgba(248,113,113,.08);
-    border: 1px solid rgba(248,113,113,.3);
-    border-radius: 10px; padding: 18px 20px;
-    font-size: 16px; color: var(--error); line-height: 1.6;
-  }
+  .error-box { margin-top: 20px; display: none; background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3); border-radius: 10px; padding: 18px 20px; font-size: 16px; color: var(--error); line-height: 1.6; }
 
   .how { margin-top: 52px; max-width: 620px; width: 100%; }
-  .how-title {
-    font-size: 15px; font-weight: 700; color: var(--muted);
-    text-transform: uppercase; letter-spacing: .1em; margin-bottom: 18px;
-  }
+  .how-title { font-size: 15px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 18px; }
   .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-  .how-item {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 22px 16px; text-align: center;
-  }
+  .how-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 16px; text-align: center; }
   .how-num { font-size: 30px; font-weight: 800; color: var(--accent); margin-bottom: 10px; }
   .how-desc { font-size: 15px; color: var(--muted); line-height: 1.6; }
 
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
   .pulsing { animation: pulse 1.4s ease-in-out infinite; }
+
+  .upload-progress { margin-top: 12px; display: none; }
+  .upload-progress-bar-bg { height: 4px; background: var(--border); border-radius: 100px; overflow: hidden; }
+  .upload-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width .1s; width: 0%; }
+  .upload-progress-label { font-size: 13px; color: var(--muted); margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -189,13 +150,58 @@
   <div class="logo-icon">📸</div>
   <span class="logo-text">SlideSnap</span>
 </div>
-<p class="tagline">Snap the slides from any YouTube lecture — get a clean, downloadable study PDF</p>
+<p class="tagline">Snap the slides from any lecture — get a clean, downloadable study PDF</p>
 
 <div class="card">
-  <label class="input-label" for="url-input">YouTube Video URL</label>
-  <div class="input-row">
-    <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=..." />
-    <button class="btn" id="btn-go" onclick="startJob()">Snap it →</button>
+  <!-- Mode tabs -->
+  <div class="mode-tabs">
+    <div class="mode-tab active" id="tab-url" onclick="switchMode('url')">🔗 YouTube URL</div>
+    <div class="mode-tab" id="tab-file" onclick="switchMode('file')">📁 Upload Video</div>
+  </div>
+
+  <!-- URL mode -->
+  <div class="mode-panel active" id="panel-url">
+    <label class="input-label" for="url-input">YouTube Video URL</label>
+    <div class="input-row">
+      <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=..." />
+      <button class="btn" id="btn-go-url" onclick="startUrlJob()">Snap it →</button>
+    </div>
+
+    <div class="time-range-toggle" id="time-toggle" onclick="toggleTimeRange()">
+      <div class="toggle-track"></div>
+      <span class="toggle-label">Specific time range <span>(for long videos)</span></span>
+    </div>
+    <div class="time-inputs" id="time-inputs">
+      <div class="time-input-wrap">
+        <span class="time-sublabel">Start time</span>
+        <input type="text" id="time-start" placeholder="00:00:00" maxlength="8" oninput="formatTime(this)" />
+      </div>
+      <div class="time-sep">→</div>
+      <div class="time-input-wrap">
+        <span class="time-sublabel">End time</span>
+        <input type="text" id="time-end" placeholder="00:30:00" maxlength="8" oninput="formatTime(this)" />
+      </div>
+    </div>
+    <div class="time-hint" id="time-hint" style="display:none;">
+      💡 <strong>Tip:</strong> Use chapter timestamps from the video description. Max 45 min recommended.
+    </div>
+  </div>
+
+  <!-- File upload mode -->
+  <div class="mode-panel" id="panel-file">
+    <label class="input-label">Upload Video File</label>
+    <div class="upload-area" id="upload-area">
+      <input type="file" id="file-input" accept="video/*,.mp4,.mkv,.webm,.avi,.mov" onchange="onFileSelected(this)" />
+      <div class="upload-icon">🎬</div>
+      <div class="upload-title">Drop your video here</div>
+      <div class="upload-sub">MP4, MKV, WebM, AVI — max 500MB</div>
+    </div>
+    <div class="upload-selected" id="upload-selected"></div>
+    <div class="upload-progress" id="upload-progress">
+      <div class="upload-progress-bar-bg"><div class="upload-progress-fill" id="upload-fill"></div></div>
+      <div class="upload-progress-label" id="upload-label">Uploading...</div>
+    </div>
+    <button class="btn btn-full" id="btn-go-file" onclick="startFileJob()" disabled>Snap it →</button>
   </div>
 
   <div class="pills">
@@ -210,9 +216,7 @@
       <span class="progress-step pulsing" id="progress-step">Starting…</span>
       <span class="progress-pct" id="progress-pct">0%</span>
     </div>
-    <div class="progress-bar-bg">
-      <div class="progress-bar-fill" id="progress-fill"></div>
-    </div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill"></div></div>
     <div class="steps" id="steps-list"></div>
   </div>
 
@@ -233,7 +237,7 @@
   <div class="how-grid">
     <div class="how-item">
       <div class="how-num">1</div>
-      <div class="how-desc">Paste any YouTube educational video link</div>
+      <div class="how-desc">Paste a YouTube link or upload a video file</div>
     </div>
     <div class="how-item">
       <div class="how-num">2</div>
@@ -247,68 +251,157 @@
 </div>
 
 <script>
-const STEP_LABELS = [
-  "Fetching video info",
-  "Downloading video",
-  "Extracting frames",
-  "Removing duplicates",
-  "Reading slides with AI",
-  "Organising content",
-  "Building PDF",
-];
-
-let pollTimer = null;
-let currentJobId = null;
+const STEP_LABELS = ["Fetching video info","Downloading video","Extracting frames","Removing duplicates","Reading slides with AI","Organising content","Building PDF"];
+let pollTimer = null, currentJobId = null, timeRangeOn = false, selectedFile = null;
 
 function $(id) { return document.getElementById(id); }
+
+function switchMode(mode) {
+  $("tab-url").classList.toggle("active", mode === "url");
+  $("tab-file").classList.toggle("active", mode === "file");
+  $("panel-url").classList.toggle("active", mode === "url");
+  $("panel-file").classList.toggle("active", mode === "file");
+  $("error-box").style.display = "none";
+  $("result-wrap").style.display = "none";
+  $("progress-wrap").style.display = "none";
+}
+
+function toggleTimeRange() {
+  timeRangeOn = !timeRangeOn;
+  $("time-toggle").classList.toggle("on", timeRangeOn);
+  $("time-inputs").classList.toggle("visible", timeRangeOn);
+  $("time-hint").style.display = timeRangeOn ? "block" : "none";
+}
+
+function formatTime(input) {
+  let v = input.value.replace(/[^0-9]/g, "");
+  if (v.length > 6) v = v.slice(0, 6);
+  if (v.length > 4) v = v.slice(0,2) + ":" + v.slice(2,4) + ":" + v.slice(4);
+  else if (v.length > 2) v = v.slice(0,2) + ":" + v.slice(2);
+  input.value = v;
+}
+
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  selectedFile = file;
+  const mb = (file.size / 1024 / 1024).toFixed(1);
+  const sel = $("upload-selected");
+  sel.textContent = `📄 ${file.name} (${mb} MB)`;
+  sel.classList.add("visible");
+  $("btn-go-file").disabled = false;
+}
+
+// Drag & drop
+const ua = $("upload-area");
+ua.addEventListener("dragover", e => { e.preventDefault(); ua.classList.add("dragover"); });
+ua.addEventListener("dragleave", () => ua.classList.remove("dragover"));
+ua.addEventListener("drop", e => {
+  e.preventDefault(); ua.classList.remove("dragover");
+  const file = e.dataTransfer.files[0];
+  if (file) { $("file-input").files = e.dataTransfer.files; onFileSelected($("file-input")); }
+});
 
 function showError(msg) {
   $("error-box").textContent = "⚠ " + msg;
   $("error-box").style.display = "block";
   $("progress-wrap").style.display = "none";
-  $("btn-go").disabled = false;
-  $("btn-go").textContent = "Snap it →";
+  $("btn-go-url").disabled = false;
+  $("btn-go-url").textContent = "Snap it →";
+  $("btn-go-file").disabled = false;
+  $("btn-go-file").textContent = "Snap it →";
 }
 
 function setProgress(step, pct) {
   $("progress-step").textContent = step;
   $("progress-pct").textContent = pct + "%";
   $("progress-fill").style.width = pct + "%";
-
-  const activeIndex = pct < 15 ? 0 : pct < 25 ? 1 : pct < 35 ? 2 :
-    pct < 40 ? 3 : pct < 82 ? 4 : pct < 93 ? 5 : 6;
-
+  const activeIndex = pct < 15 ? 0 : pct < 25 ? 1 : pct < 35 ? 2 : pct < 40 ? 3 : pct < 82 ? 4 : pct < 93 ? 5 : 6;
   $("steps-list").innerHTML = STEP_LABELS.map((label, i) => {
     const cls = i < activeIndex ? "done" : i === activeIndex ? "active" : "";
     return `<div class="step-item ${cls}"><div class="step-dot"></div><span>${label}</span></div>`;
   }).join("");
 }
 
-async function startJob() {
-  const url = $("url-input").value.trim();
-  if (!url) return;
-
+function startPolling(job_id) {
+  currentJobId = job_id;
   $("error-box").style.display = "none";
   $("result-wrap").style.display = "none";
   $("progress-wrap").style.display = "block";
-  $("btn-go").disabled = true;
-  $("btn-go").textContent = "Snapping…";
   setProgress("Starting…", 0);
-
   if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollStatus, 2000);
+}
 
+async function startUrlJob() {
+  const url = $("url-input").value.trim();
+  if (!url) return;
+  const payload = { url };
+  if (timeRangeOn) {
+    const start = $("time-start").value.trim();
+    const end   = $("time-end").value.trim();
+    if (start) payload.start_time = start;
+    if (end)   payload.end_time   = end;
+  }
+  $("btn-go-url").disabled = true;
+  $("btn-go-url").textContent = "Snapping…";
   try {
     const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) { showError(data.detail || "Server error"); return; }
-    currentJobId = data.job_id;
-    pollTimer = setInterval(pollStatus, 2000);
-  } catch (e) {
-    showError("Could not connect to server. Is it running?");
+    startPolling(data.job_id);
+  } catch(e) { showError("Could not connect to server."); }
+}
+
+async function startFileJob() {
+  if (!selectedFile) return;
+  $("btn-go-file").disabled = true;
+  $("btn-go-file").textContent = "Uploading…";
+  $("error-box").style.display = "none";
+  $("result-wrap").style.display = "none";
+
+  // Show upload progress
+  const upProg = $("upload-progress");
+  upProg.style.display = "block";
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+
+  try {
+    // XHR for upload progress
+    const job_id = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload");
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pct = Math.round(e.loaded / e.total * 100);
+          $("upload-fill").style.width = pct + "%";
+          $("upload-label").textContent = `Uploading… ${pct}%`;
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data.job_id);
+        } else {
+          try { reject(JSON.parse(xhr.responseText).detail); }
+          catch { reject("Upload failed"); }
+        }
+      };
+      xhr.onerror = () => reject("Upload failed");
+      xhr.send(formData);
+    });
+
+    upProg.style.display = "none";
+    startPolling(job_id);
+  } catch(e) {
+    upProg.style.display = "none";
+    showError(typeof e === "string" ? e : "Upload failed.");
+    $("btn-go-file").disabled = false;
+    $("btn-go-file").textContent = "Snap it →";
   }
 }
 
@@ -317,28 +410,23 @@ async function pollStatus() {
   try {
     const res = await fetch(`/api/status/${currentJobId}`);
     const job = await res.json();
-
     if (job.status === "processing" || job.status === "pending") {
-      setProgress(job.step, job.pct);
-      return;
+      setProgress(job.step, job.pct); return;
     }
     clearInterval(pollTimer);
-
     if (job.status === "done") {
       $("progress-wrap").style.display = "none";
       $("result-wrap").style.display = "flex";
       $("result-title").textContent = job.filename.replace(/_/g, " ").replace(".pdf", "");
       $("result-meta").textContent = "PDF ready — click to download";
-      $("btn-go").disabled = false;
-      $("btn-go").textContent = "Snap it →";
+      $("btn-go-url").disabled = false; $("btn-go-url").textContent = "Snap it →";
+      $("btn-go-file").disabled = false; $("btn-go-file").textContent = "Snap it →";
       $("btn-dl").onclick = () => { window.location.href = `/api/download/${currentJobId}`; };
-    } else {
-      showError(job.error || "Something went wrong.");
-    }
-  } catch (e) {}
+    } else { showError(job.error || "Something went wrong."); }
+  } catch(e) {}
 }
 
-$("url-input").addEventListener("keydown", e => { if (e.key === "Enter") startJob(); });
+$("url-input").addEventListener("keydown", e => { if (e.key === "Enter") startUrlJob(); });
 </script>
 </body>
 </html>

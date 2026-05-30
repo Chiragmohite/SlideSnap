@@ -145,12 +145,16 @@ def download_video(url: str, out_dir: Path,
                    end_time: Optional[str] = None) -> Path:
     out_tpl = str(out_dir / "video.%(ext)s")
     cmd = [
-        *tool_cmd("yt-dlp"), "--no-playlist",
-        "-f", "bv*[height<=480]+ba/b[height<=480]/best[height<=480]",
-        "--merge-output-format", "mp4",
-        "--no-check-certificate",
-        "-o", out_tpl,
-    ]
+        
+    *tool_cmd("yt-dlp"), "--no-playlist",
+    "-f", "bv*[height<=480]+ba/b[height<=480]/best[height<=480]",
+    "--merge-output-format", "mp4",
+    "--no-check-certificate",
+    "--legacy-server-connect",   # ← fixes SSL EOF on HF Spaces
+    "--extractor-retries", "3",
+    "-o", out_tpl,
+]
+    
     if COOKIES_PATH.exists():
         cmd += ["--cookies", str(COOKIES_PATH)]
     if start_time or end_time:

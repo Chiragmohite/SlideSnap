@@ -2,7 +2,7 @@
 VidToDoc backend: YouTube URL -> slide frames -> Groq vision -> PDF
 """
 from __future__ import annotations
-import asyncio, base64, glob, json, os, re, shutil, subprocess, sys, tempfile, uuid
+import asyncio, base64, os, re, shutil, subprocess, sys, tempfile, uuid
 from pathlib import Path
 from typing import Optional
 import httpx, imagehash
@@ -24,6 +24,7 @@ GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 MAX_SLIDES   = 50
 PHASH_THRESHOLD = 10
+COOKIES_PATH = Path(__file__).resolve().parent / "cookies.txt"
 
 SLIDE_PROMPT = (
     "This is a frame from an educational video. "
@@ -42,8 +43,8 @@ JOBS: dict[str, dict] = {}
 
 class GenerateRequest(BaseModel):
     url: str = Field(..., min_length=10)
-    start_time: Optional[str] = None   # e.g. "00:10:00"
-    end_time:   Optional[str] = None   # e.g. "00:40:00"
+    start_time: Optional[str] = None
+    end_time:   Optional[str] = None
 
 _TOOL_CACHE: dict[str, list[str]] = {}
 
@@ -84,16 +85,6 @@ def parse_video_id(url: str) -> str:
         return m.group(1)
     raise HTTPException(status_code=400, detail="Invalid YouTube URL.")
 
-def time_to_seconds(t: str) -> int:
-    """Convert HH:MM:SS or MM:SS to seconds."""
-    parts = t.strip().split(":")
-    parts = [int(p) for p in parts]
-    if len(parts) == 3:
-        return parts[0]*3600 + parts[1]*60 + parts[2]
-    elif len(parts) == 2:
-        return parts[0]*60 + parts[1]
-    return int(parts[0])
-
 async def fetch_video_title(url: str, video_id: str) -> str:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -126,14 +117,18 @@ def download_video(url: str, out_dir: Path,
         *tool_cmd("yt-dlp"), "--no-playlist",
         "-f", "bv*[height<=480]+ba/b[height<=480]/best[height<=480]",
         "--merge-output-format", "mp4",
-        "--no-check-certificate",   # fixes SSL errors on HF Spaces
-        "-o", out_tpl, url,
+        "--no-check-certificate",
+        "-o", out_tpl,
     ]
-    # Add time range section if provided
+    # Use cookies if available — fixes bot detection on cloud servers
+    if COOKIES_PATH.exists():
+        cmd += ["--cookies", str(COOKIES_PATH)]
+    # Time range section
     if start_time or end_time:
         start = start_time or "00:00:00"
         end   = end_time   or "99:59:59"
         cmd += ["--download-sections", f"*{start}-{end}"]
+    cmd.append(url)
 
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if proc.returncode != 0:
@@ -308,7 +303,6 @@ async def run_job(job_id: str, url: str, api_key: str,
         video_id = parse_video_id(url)
         title    = await fetch_video_title(url, video_id)
 
-        # Build step label with time range if set
         range_label = ""
         if start_time or end_time:
             s = start_time or "start"
@@ -376,7 +370,8 @@ async def index():
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("GROQ_API_KEY"))
-    return {"ok": True, "api_key_set": key_set,
+    cookies_found = COOKIES_PATH.exists()
+    return {"ok": True, "api_key_set": key_set, "cookies_found": cookies_found,
             "ffmpeg": tool_status("ffmpeg"), "yt_dlp": tool_status("yt-dlp")}
 
 @app.post("/api/generate")

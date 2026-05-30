@@ -4,6 +4,7 @@ VidToDoc backend: YouTube URL -> slide frames -> Groq vision -> PDF
 from __future__ import annotations
 import asyncio, base64, glob, json, os, re, shutil, subprocess, sys, tempfile, uuid
 from pathlib import Path
+from typing import Optional
 import httpx, imagehash
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -41,6 +42,8 @@ JOBS: dict[str, dict] = {}
 
 class GenerateRequest(BaseModel):
     url: str = Field(..., min_length=10)
+    start_time: Optional[str] = None   # e.g. "00:10:00"
+    end_time:   Optional[str] = None   # e.g. "00:40:00"
 
 _TOOL_CACHE: dict[str, list[str]] = {}
 
@@ -51,7 +54,6 @@ def resolve_tool(name: str) -> list[str]:
     if found:
         _TOOL_CACHE[name] = [found]
         return _TOOL_CACHE[name]
-    # yt-dlp fallback: try running as a Python module
     if name == "yt-dlp":
         for cmd in (
             [sys.executable, "-m", "yt_dlp"],
@@ -64,7 +66,7 @@ def resolve_tool(name: str) -> list[str]:
                     return _TOOL_CACHE[name]
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 continue
-    hint = "Install ffmpeg via nixpacks or apt." if name == "ffmpeg" else "Install: pip install yt-dlp"
+    hint = "Install ffmpeg via apt or nixpacks." if name == "ffmpeg" else "Install: pip install yt-dlp"
     raise HTTPException(status_code=500, detail=f"'{name}' not found. {hint}")
 
 def tool_cmd(name: str) -> list[str]:
@@ -81,6 +83,16 @@ def parse_video_id(url: str) -> str:
     if m:
         return m.group(1)
     raise HTTPException(status_code=400, detail="Invalid YouTube URL.")
+
+def time_to_seconds(t: str) -> int:
+    """Convert HH:MM:SS or MM:SS to seconds."""
+    parts = t.strip().split(":")
+    parts = [int(p) for p in parts]
+    if len(parts) == 3:
+        return parts[0]*3600 + parts[1]*60 + parts[2]
+    elif len(parts) == 2:
+        return parts[0]*60 + parts[1]
+    return int(parts[0])
 
 async def fetch_video_title(url: str, video_id: str) -> str:
     try:
@@ -106,14 +118,23 @@ def get_video_duration(video: Path) -> float:
     except Exception:
         return 600.0
 
-def download_video(url: str, out_dir: Path) -> Path:
+def download_video(url: str, out_dir: Path,
+                   start_time: Optional[str] = None,
+                   end_time: Optional[str] = None) -> Path:
     out_tpl = str(out_dir / "video.%(ext)s")
     cmd = [
         *tool_cmd("yt-dlp"), "--no-playlist",
-        "-f", "bv*[height<=720]+ba/b[height<=720]/best[height<=720]",
+        "-f", "bv*[height<=480]+ba/b[height<=480]/best[height<=480]",
         "--merge-output-format", "mp4",
+        "--no-check-certificate",   # fixes SSL errors on HF Spaces
         "-o", out_tpl, url,
     ]
+    # Add time range section if provided
+    if start_time or end_time:
+        start = start_time or "00:00:00"
+        end   = end_time   or "99:59:59"
+        cmd += ["--download-sections", f"*{start}-{end}"]
+
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if proc.returncode != 0:
         raise HTTPException(status_code=502, detail=f"Download failed: {proc.stderr[-400:]}")
@@ -280,16 +301,24 @@ def build_pdf(url: str, title: str, text: str, out_path: Path) -> None:
 def _set(job_id: str, **kw):
     JOBS[job_id].update(kw)
 
-async def run_job(job_id: str, url: str, api_key: str):
+async def run_job(job_id: str, url: str, api_key: str,
+                  start_time: Optional[str], end_time: Optional[str]):
     try:
         _set(job_id, status="processing", step="Fetching video info...", pct=5)
         video_id = parse_video_id(url)
         title    = await fetch_video_title(url, video_id)
-        _set(job_id, step=f"Downloading: {title}...", pct=10)
+
+        # Build step label with time range if set
+        range_label = ""
+        if start_time or end_time:
+            s = start_time or "start"
+            e = end_time   or "end"
+            range_label = f" [{s} → {e}]"
+        _set(job_id, step=f"Downloading: {title}{range_label}...", pct=10)
 
         with tempfile.TemporaryDirectory(prefix="vidtodoc_") as tmp:
             work = Path(tmp)
-            video_path = download_video(url, work)
+            video_path = download_video(url, work, start_time, end_time)
 
             _set(job_id, step="Extracting frames...", pct=25)
             frames_dir = work / "frames"
@@ -361,7 +390,8 @@ async def generate(req: GenerateRequest):
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {"status": "pending", "step": "Starting...", "pct": 0,
                     "pdf_bytes": None, "filename": None, "error": None}
-    asyncio.create_task(run_job(job_id, req.url.strip(), api_key))
+    asyncio.create_task(run_job(job_id, req.url.strip(), api_key,
+                                req.start_time, req.end_time))
     return {"job_id": job_id}
 
 @app.get("/api/status/{job_id}")

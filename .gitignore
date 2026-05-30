@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 *.pyo
 ngrok.exe
+backend/cookies.txt

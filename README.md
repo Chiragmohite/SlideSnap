@@ -1,3 +1,12 @@
+---
+title: Slidesnap
+emoji: 📸
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # 📸 SlideSnap
 
 **Snap the slides from any YouTube lecture — get a clean, downloadable study PDF.**
@@ -127,3 +136,4 @@ Get a free key at [console.groq.com](https://console.groq.com)
 ## 🙋 Author
 
 Made by [Chirag Mohite](https://github.com/Chiragmohite)
+

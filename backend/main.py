@@ -1,12 +1,13 @@
 """
-VidToDoc backend: YouTube URL -> slide frames -> Groq vision -> PDF
+VidToDoc backend: YouTube URL or uploaded video -> slide frames -> Groq vision -> PDF
 """
 from __future__ import annotations
 import asyncio, base64, glob, json, os, re, shutil, subprocess, sys, tempfile, uuid
 from pathlib import Path
+from typing import Optional
 import httpx, imagehash
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from PIL import Image
@@ -23,6 +24,11 @@ GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 MAX_SLIDES   = 50
 PHASH_THRESHOLD = 10
+MAX_UPLOAD_MB = 500
+
+# File-based job store — works across HF Spaces instances
+JOBS_DIR = Path("/tmp/slidesnap_jobs")
+JOBS_DIR.mkdir(exist_ok=True)
 
 SLIDE_PROMPT = (
     "This is a frame from an educational video. "
@@ -37,12 +43,34 @@ app = FastAPI(title="VidToDoc API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
-JOBS: dict[str, dict] = {}
-
 class GenerateRequest(BaseModel):
     url: str = Field(..., min_length=10)
 
 _TOOL_CACHE: dict[str, list[str]] = {}
+
+# ── File-based job store ──────────────────────────────────────────────────────
+
+def job_path(job_id: str) -> Path:
+    return JOBS_DIR / f"{job_id}.json"
+
+def pdf_path(job_id: str) -> Path:
+    return JOBS_DIR / f"{job_id}.pdf"
+
+def job_get(job_id: str) -> Optional[dict]:
+    p = job_path(job_id)
+    if not p.exists(): return None
+    try: return json.loads(p.read_text())
+    except: return None
+
+def job_set(job_id: str, **kw):
+    data = job_get(job_id) or {}
+    data.update(kw)
+    pdf_bytes = data.pop("pdf_bytes", None)
+    job_path(job_id).write_text(json.dumps(data))
+    if pdf_bytes is not None:
+        pdf_path(job_id).write_bytes(pdf_bytes)
+
+# ── Tool resolution ───────────────────────────────────────────────────────────
 
 def resolve_tool(name: str) -> list[str]:
     if name in _TOOL_CACHE:
@@ -51,7 +79,6 @@ def resolve_tool(name: str) -> list[str]:
     if found:
         _TOOL_CACHE[name] = [found]
         return _TOOL_CACHE[name]
-    # yt-dlp fallback: try running as a Python module
     if name == "yt-dlp":
         for cmd in (
             [sys.executable, "-m", "yt_dlp"],
@@ -67,19 +94,17 @@ def resolve_tool(name: str) -> list[str]:
     hint = "Install ffmpeg via nixpacks or apt." if name == "ffmpeg" else "Install: pip install yt-dlp"
     raise HTTPException(status_code=500, detail=f"'{name}' not found. {hint}")
 
-def tool_cmd(name: str) -> list[str]:
-    return resolve_tool(name)
+def tool_cmd(name: str) -> list[str]: return resolve_tool(name)
 
 def tool_status(name: str) -> dict:
-    try:
-        return {"available": True, "cmd": resolve_tool(name)}
-    except HTTPException as e:
-        return {"available": False, "error": getattr(e, "detail", "not found")}
+    try: return {"available": True, "cmd": resolve_tool(name)}
+    except HTTPException as e: return {"available": False, "error": getattr(e, "detail", "not found")}
+
+# ── YouTube helpers ───────────────────────────────────────────────────────────
 
 def parse_video_id(url: str) -> str:
     m = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([A-Za-z0-9_-]{6,})", url)
-    if m:
-        return m.group(1)
+    if m: return m.group(1)
     raise HTTPException(status_code=400, detail="Invalid YouTube URL.")
 
 async def fetch_video_title(url: str, video_id: str) -> str:
@@ -260,8 +285,8 @@ def build_pdf(url: str, title: str, text: str, out_path: Path) -> None:
         return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     doc = SimpleDocTemplate(str(out_path), pagesize=A4,
-    leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm,
-    title=title, author="SlideSnap", subject="Study Notes")
+        leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm,
+        title=title, author="SlideSnap", subject="Study Notes")
     story = [
         Paragraph(esc(title), title_style),
         Paragraph(esc(f"Source: {url}"), meta_style),
@@ -277,65 +302,82 @@ def build_pdf(url: str, title: str, text: str, out_path: Path) -> None:
             story.append(Paragraph(esc(s), body_style))
     doc.build(story)
 
-def _set(job_id: str, **kw):
-    JOBS[job_id].update(kw)
+# ── Core processing (shared by URL and upload) ────────────────────────────────
+
+async def process_video(job_id: str, video_path: Path, title: str, source: str, api_key: str):
+    job_set(job_id, step="Extracting frames...", pct=25)
+    frames_dir = video_path.parent / "frames"
+    frames_dir.mkdir(exist_ok=True)
+    raw_frames = extract_frames(video_path, frames_dir)
+    if not raw_frames:
+        raise HTTPException(status_code=502, detail="No frames extracted.")
+
+    job_set(job_id, step="Removing duplicate frames...", pct=35)
+    unique_frames = dedupe_frames(raw_frames)
+    if not unique_frames:
+        raise HTTPException(status_code=502, detail="No usable frames.")
+
+    total = len(unique_frames)
+    slides: list[tuple[int, str]] = []
+    slide_num = 0
+    for i, frame_path in enumerate(unique_frames):
+        pct = 35 + int((i / total) * 45)
+        job_set(job_id, step=f"Reading frame {i+1} of {total}...", pct=pct)
+        text = await groq_extract_slide(api_key, frame_path)
+        if not skip_slide_text(text):
+            slide_num += 1
+            slides.append((slide_num, text))
+        await asyncio.sleep(8)
+
+    if not slides:
+        raise HTTPException(status_code=502, detail="No text found in video frames.")
+
+    job_set(job_id, step="Cleaning and organising content...", pct=82)
+    await asyncio.sleep(8)
+    clean_text = await consolidate_text(api_key, slides)
+
+    job_set(job_id, step="Building PDF...", pct=93)
+    out_pdf = video_path.parent / "output.pdf"
+    build_pdf(source, title, clean_text, out_pdf)
+    pdf_bytes = out_pdf.read_bytes()
+
+    safe_title = re.sub(r"[^a-zA-Z0-9 _-]", "", title).strip().replace(" ", "_")[:60]
+    filename = f"{safe_title or 'notes'}.pdf"
+    job_set(job_id, status="done", step="Done!", pct=100, pdf_bytes=pdf_bytes, filename=filename)
+
+# ── Job runners ───────────────────────────────────────────────────────────────
 
 async def run_job(job_id: str, url: str, api_key: str):
     try:
-        _set(job_id, status="processing", step="Fetching video info...", pct=5)
+        job_set(job_id, status="processing", step="Fetching video info...", pct=5)
         video_id = parse_video_id(url)
         title    = await fetch_video_title(url, video_id)
-        _set(job_id, step=f"Downloading: {title}...", pct=10)
+        job_set(job_id, step=f"Downloading: {title}...", pct=10)
 
         with tempfile.TemporaryDirectory(prefix="vidtodoc_") as tmp:
             work = Path(tmp)
             video_path = download_video(url, work)
-
-            _set(job_id, step="Extracting frames...", pct=25)
-            frames_dir = work / "frames"
-            frames_dir.mkdir()
-            raw_frames = extract_frames(video_path, frames_dir)
-            if not raw_frames:
-                raise HTTPException(status_code=502, detail="No frames extracted.")
-
-            _set(job_id, step="Removing duplicate frames...", pct=35)
-            unique_frames = dedupe_frames(raw_frames)
-            if not unique_frames:
-                raise HTTPException(status_code=502, detail="No usable frames.")
-
-            total = len(unique_frames)
-            slides: list[tuple[int, str]] = []
-            slide_num = 0
-            for i, frame_path in enumerate(unique_frames):
-                pct = 35 + int((i / total) * 45)
-                _set(job_id, step=f"Reading frame {i+1} of {total}...", pct=pct)
-                text = await groq_extract_slide(api_key, frame_path)
-                if not skip_slide_text(text):
-                    slide_num += 1
-                    slides.append((slide_num, text))
-                await asyncio.sleep(8)
-
-            if not slides:
-                raise HTTPException(status_code=502, detail="No text found in video frames.")
-
-            _set(job_id, step="Cleaning and organising content...", pct=82)
-            await asyncio.sleep(8)
-            clean_text = await consolidate_text(api_key, slides)
-
-            _set(job_id, step="Building PDF...", pct=93)
-            pdf_path = work / "output.pdf"
-            build_pdf(url, title, clean_text, pdf_path)
-            pdf_bytes = pdf_path.read_bytes()
-
-        safe_title = re.sub(r"[^a-zA-Z0-9 _-]", "", title).strip().replace(" ", "_")[:60]
-        filename   = f"{safe_title or video_id}.pdf"
-        _set(job_id, status="done", step="Done!", pct=100,
-             pdf_bytes=pdf_bytes, filename=filename)
+            await process_video(job_id, video_path, title, url, api_key)
 
     except HTTPException as e:
-        _set(job_id, status="error", step="Failed", error=e.detail)
+        job_set(job_id, status="error", step="Failed", error=e.detail)
     except Exception as e:
-        _set(job_id, status="error", step="Failed", error=str(e))
+        job_set(job_id, status="error", step="Failed", error=str(e))
+
+async def run_job_upload(job_id: str, video_path: Path, orig_filename: str, api_key: str):
+    try:
+        job_set(job_id, status="processing", step="Processing uploaded video...", pct=15)
+        title = Path(orig_filename).stem.replace("_", " ").replace("-", " ")
+        await process_video(job_id, video_path, title, f"Uploaded: {orig_filename}", api_key)
+    except HTTPException as e:
+        job_set(job_id, status="error", step="Failed", error=e.detail)
+    except Exception as e:
+        job_set(job_id, status="error", step="Failed", error=str(e))
+    finally:
+        try: video_path.parent.rmdir()
+        except: pass
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 async def index():
@@ -346,41 +388,63 @@ async def index():
 
 @app.get("/api/health")
 async def health():
-    key_set = bool(os.environ.get("GROQ_API_KEY"))
-    return {"ok": True, "api_key_set": key_set,
+    return {"ok": True, "api_key_set": bool(os.environ.get("GROQ_API_KEY")),
             "ffmpeg": tool_status("ffmpeg"), "yt_dlp": tool_status("yt-dlp")}
 
 @app.post("/api/generate")
 async def generate(req: GenerateRequest):
     api_key = os.environ.get("GROQ_API_KEY", "").strip()
     if not api_key:
-        raise HTTPException(status_code=500,
-            detail="GROQ_API_KEY not set. Add it to backend/.env and restart the server.")
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not set.")
     resolve_tool("ffmpeg")
     resolve_tool("yt-dlp")
     job_id = str(uuid.uuid4())
-    JOBS[job_id] = {"status": "pending", "step": "Starting...", "pct": 0,
-                    "pdf_bytes": None, "filename": None, "error": None}
+    job_set(job_id, status="pending", step="Starting...", pct=0, filename=None, error=None)
     asyncio.create_task(run_job(job_id, req.url.strip(), api_key))
+    return {"job_id": job_id}
+
+@app.post("/api/upload")
+async def upload(file: UploadFile = File(...)):
+    api_key = os.environ.get("GROQ_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not set.")
+    resolve_tool("ffmpeg")
+
+    contents = await file.read()
+    size_mb = len(contents) / 1024 / 1024
+    if size_mb > MAX_UPLOAD_MB:
+        raise HTTPException(status_code=413, detail=f"File too large ({size_mb:.0f}MB). Max {MAX_UPLOAD_MB}MB.")
+
+    suffix = Path(file.filename or "video.mp4").suffix or ".mp4"
+    tmp_dir = Path(tempfile.mkdtemp(prefix="upload_"))
+    tmp_path = tmp_dir / f"video{suffix}"
+    tmp_path.write_bytes(contents)
+
+    job_id = str(uuid.uuid4())
+    job_set(job_id, status="pending", step="Starting...", pct=0, filename=None, error=None)
+    asyncio.create_task(run_job_upload(job_id, tmp_path, file.filename or "video.mp4", api_key))
     return {"job_id": job_id}
 
 @app.get("/api/status/{job_id}")
 async def status(job_id: str):
-    job = JOBS.get(job_id)
+    job = job_get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
-    return {"status": job["status"], "step": job["step"], "pct": job["pct"],
-            "filename": job["filename"], "error": job["error"]}
+    return {"status": job.get("status"), "step": job.get("step"),
+            "pct": job.get("pct"), "filename": job.get("filename"), "error": job.get("error")}
 
 @app.get("/api/download/{job_id}")
 async def download(job_id: str):
-    job = JOBS.get(job_id)
-    if not job or job["status"] != "done":
+    job = job_get(job_id)
+    if not job or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="PDF not ready.")
+    p = pdf_path(job_id)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="PDF file missing.")
     return Response(
-        content=job["pdf_bytes"],
+        content=p.read_bytes(),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{job["filename"]}"'},
+        headers={"Content-Disposition": f'attachment; filename="{job.get("filename", "notes.pdf")}"'},
     )
 
 if __name__ == "__main__":

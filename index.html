@@ -31,10 +31,7 @@
     padding: 56px 20px 100px;
   }
 
-  .logo {
-    display: flex; align-items: center; gap: 14px;
-    margin-bottom: 12px;
-  }
+  .logo { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
   .logo-icon {
     width: 56px; height: 56px;
     background: linear-gradient(135deg, var(--accent), var(--accent2));
@@ -43,139 +40,73 @@
     font-size: 28px;
   }
   .logo-text { font-size: 40px; font-weight: 800; letter-spacing: -1px; }
+  .tagline { font-size: 20px; color: var(--muted); margin-bottom: 48px; text-align: center; line-height: 1.5; max-width: 520px; }
 
-  .tagline {
-    font-size: 20px; color: var(--muted);
-    margin-bottom: 48px; text-align: center;
-    line-height: 1.5; max-width: 520px;
-  }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px; width: 100%; max-width: 620px; }
 
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 36px;
-    width: 100%; max-width: 620px;
-  }
-
-  .input-label {
-    font-size: 18px; font-weight: 600; color: var(--muted);
-    margin-bottom: 12px; display: block;
-  }
+  .input-label { font-size: 18px; font-weight: 600; color: var(--muted); margin-bottom: 12px; display: block; }
   .input-row { display: flex; gap: 10px; }
 
-  input[type="url"] {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 15px 18px;
-    color: var(--text);
-    font-size: 17px;
-    outline: none;
-    transition: border-color .2s;
+  input[type="url"], input[type="text"] {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 15px 18px; color: var(--text);
+    font-size: 17px; outline: none; transition: border-color .2s;
   }
-  input[type="url"]:focus { border-color: var(--accent); }
-  input[type="url"]::placeholder { color: var(--muted); font-size: 16px; }
+  input[type="url"]:focus, input[type="text"]:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); font-size: 16px; }
 
-  .btn {
-    background: var(--accent);
-    color: #fff; border: none;
-    border-radius: 10px;
-    padding: 15px 26px;
-    font-size: 17px; font-weight: 700;
-    cursor: pointer;
-    transition: opacity .2s, transform .1s;
-    white-space: nowrap;
-  }
+  .time-range-toggle { margin-top: 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .toggle-track { width: 40px; height: 22px; background: var(--border); border-radius: 100px; position: relative; transition: background .2s; flex-shrink: 0; }
+  .toggle-track::after { content: ''; width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform .2s; }
+  .time-range-toggle.on .toggle-track { background: var(--accent); }
+  .time-range-toggle.on .toggle-track::after { transform: translateX(18px); }
+  .toggle-label { font-size: 15px; color: var(--muted); }
+  .toggle-label span { color: var(--accent2); font-weight: 600; }
+  .time-inputs { display: none; gap: 12px; margin-top: 14px; align-items: center; }
+  .time-inputs.visible { display: flex; }
+  .time-input-wrap { flex: 1; }
+  .time-sublabel { font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block; }
+  .time-inputs input[type="text"] { text-align: center; font-size: 18px; font-weight: 600; letter-spacing: 2px; padding: 12px 10px; }
+  .time-sep { color: var(--muted); font-size: 20px; margin-top: 20px; }
+  .time-hint { font-size: 13px; color: var(--muted); margin-top: 10px; padding: 10px 14px; background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.2); border-radius: 8px; line-height: 1.5; }
+  .time-hint strong { color: var(--accent2); }
+
+  .btn { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 15px 26px; font-size: 17px; font-weight: 700; cursor: pointer; transition: opacity .2s, transform .1s; white-space: nowrap; }
   .btn:hover { opacity: .88; }
   .btn:active { transform: scale(.97); }
   .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
 
   .pills { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
-  .pill {
-    font-size: 14px; color: var(--muted);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    padding: 7px 14px;
-  }
+  .pill { font-size: 14px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 100px; padding: 7px 14px; }
 
   .progress-wrap { margin-top: 32px; display: none; }
-  .progress-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 12px;
-  }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .progress-step { font-size: 17px; color: var(--text); font-weight: 500; }
-  .progress-pct  { font-size: 17px; font-weight: 700; color: var(--accent2); }
-  .progress-bar-bg {
-    height: 8px; background: var(--border); border-radius: 100px; overflow: hidden;
-  }
-  .progress-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    border-radius: 100px;
-    transition: width .5s ease;
-    width: 0%;
-  }
-
+  .progress-pct { font-size: 17px; font-weight: 700; color: var(--accent2); }
+  .progress-bar-bg { height: 8px; background: var(--border); border-radius: 100px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 100px; transition: width .5s ease; width: 0%; }
   .steps { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
-  .step-item {
-    display: flex; align-items: center; gap: 14px;
-    font-size: 16px; color: var(--muted);
-  }
+  .step-item { display: flex; align-items: center; gap: 14px; font-size: 16px; color: var(--muted); }
   .step-item.active { color: var(--text); font-weight: 600; }
-  .step-item.done   { color: var(--success); }
-  .step-dot {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: var(--border); flex-shrink: 0;
-  }
+  .step-item.done { color: var(--success); }
+  .step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
   .step-item.active .step-dot { background: var(--accent); }
-  .step-item.done   .step-dot { background: var(--success); }
+  .step-item.done .step-dot { background: var(--success); }
 
-  .result-wrap {
-    margin-top: 32px;
-    background: var(--bg);
-    border: 1px solid var(--success);
-    border-radius: 12px;
-    padding: 22px 24px;
-    display: none;
-    align-items: center; gap: 18px;
-  }
+  .result-wrap { margin-top: 32px; background: var(--bg); border: 1px solid var(--success); border-radius: 12px; padding: 22px 24px; display: none; align-items: center; gap: 18px; }
   .result-icon { font-size: 36px; flex-shrink: 0; }
   .result-info { flex: 1; min-width: 0; }
-  .result-title {
-    font-size: 18px; font-weight: 700;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
+  .result-title { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .result-meta { font-size: 15px; color: var(--muted); margin-top: 4px; }
-  .btn-dl {
-    background: var(--success); color: #000;
-    border: none; border-radius: 10px;
-    padding: 13px 20px; font-size: 16px; font-weight: 700;
-    cursor: pointer; white-space: nowrap; flex-shrink: 0;
-    transition: opacity .2s;
-  }
+  .btn-dl { background: var(--success); color: #000; border: none; border-radius: 10px; padding: 13px 20px; font-size: 16px; font-weight: 700; cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity .2s; }
   .btn-dl:hover { opacity: .85; }
 
-  .error-box {
-    margin-top: 20px; display: none;
-    background: rgba(248,113,113,.08);
-    border: 1px solid rgba(248,113,113,.3);
-    border-radius: 10px; padding: 18px 20px;
-    font-size: 16px; color: var(--error); line-height: 1.6;
-  }
+  .error-box { margin-top: 20px; display: none; background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.3); border-radius: 10px; padding: 18px 20px; font-size: 16px; color: var(--error); line-height: 1.6; }
 
   .how { margin-top: 52px; max-width: 620px; width: 100%; }
-  .how-title {
-    font-size: 15px; font-weight: 700; color: var(--muted);
-    text-transform: uppercase; letter-spacing: .1em; margin-bottom: 18px;
-  }
+  .how-title { font-size: 15px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 18px; }
   .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-  .how-item {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 22px 16px; text-align: center;
-  }
+  .how-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 16px; text-align: center; }
   .how-num { font-size: 30px; font-weight: 800; color: var(--accent); margin-bottom: 10px; }
   .how-desc { font-size: 15px; color: var(--muted); line-height: 1.6; }
 
@@ -198,6 +129,25 @@
     <button class="btn" id="btn-go" onclick="startJob()">Snap it →</button>
   </div>
 
+  <div class="time-range-toggle" id="time-toggle" onclick="toggleTimeRange()">
+    <div class="toggle-track"></div>
+    <span class="toggle-label">Specific time range <span>(for long videos)</span></span>
+  </div>
+  <div class="time-inputs" id="time-inputs">
+    <div class="time-input-wrap">
+      <span class="time-sublabel">Start time</span>
+      <input type="text" id="time-start" placeholder="00:00:00" maxlength="8" oninput="formatTime(this)" />
+    </div>
+    <div class="time-sep">→</div>
+    <div class="time-input-wrap">
+      <span class="time-sublabel">End time</span>
+      <input type="text" id="time-end" placeholder="00:30:00" maxlength="8" oninput="formatTime(this)" />
+    </div>
+  </div>
+  <div class="time-hint" id="time-hint" style="display:none;">
+    💡 <strong>Tip:</strong> Use chapter timestamps from the video description. Max 45 min recommended.
+  </div>
+
   <div class="pills">
     <span class="pill">🔒 No login needed</span>
     <span class="pill">⚡ AI-powered</span>
@@ -210,9 +160,7 @@
       <span class="progress-step pulsing" id="progress-step">Starting…</span>
       <span class="progress-pct" id="progress-pct">0%</span>
     </div>
-    <div class="progress-bar-bg">
-      <div class="progress-bar-fill" id="progress-fill"></div>
-    </div>
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill"></div></div>
     <div class="steps" id="steps-list"></div>
   </div>
 
@@ -231,36 +179,31 @@
 <div class="how">
   <div class="how-title">How it works</div>
   <div class="how-grid">
-    <div class="how-item">
-      <div class="how-num">1</div>
-      <div class="how-desc">Paste any YouTube educational video link</div>
-    </div>
-    <div class="how-item">
-      <div class="how-num">2</div>
-      <div class="how-desc">AI snaps every slide and reads the text</div>
-    </div>
-    <div class="how-item">
-      <div class="how-num">3</div>
-      <div class="how-desc">Download a clean, organised PDF in minutes</div>
-    </div>
+    <div class="how-item"><div class="how-num">1</div><div class="how-desc">Paste any YouTube educational video link</div></div>
+    <div class="how-item"><div class="how-num">2</div><div class="how-desc">AI snaps every slide and reads the text</div></div>
+    <div class="how-item"><div class="how-num">3</div><div class="how-desc">Download a clean, organised PDF in minutes</div></div>
   </div>
 </div>
 
 <script>
-const STEP_LABELS = [
-  "Fetching video info",
-  "Downloading video",
-  "Extracting frames",
-  "Removing duplicates",
-  "Reading slides with AI",
-  "Organising content",
-  "Building PDF",
-];
-
-let pollTimer = null;
-let currentJobId = null;
-
+const STEP_LABELS = ["Fetching video info","Downloading video","Extracting frames","Removing duplicates","Reading slides with AI","Organising content","Building PDF"];
+let pollTimer = null, currentJobId = null, timeRangeOn = false;
 function $(id) { return document.getElementById(id); }
+
+function toggleTimeRange() {
+  timeRangeOn = !timeRangeOn;
+  $("time-toggle").classList.toggle("on", timeRangeOn);
+  $("time-inputs").classList.toggle("visible", timeRangeOn);
+  $("time-hint").style.display = timeRangeOn ? "block" : "none";
+}
+
+function formatTime(input) {
+  let v = input.value.replace(/[^0-9]/g, "");
+  if (v.length > 6) v = v.slice(0, 6);
+  if (v.length > 4) v = v.slice(0,2) + ":" + v.slice(2,4) + ":" + v.slice(4);
+  else if (v.length > 2) v = v.slice(0,2) + ":" + v.slice(2);
+  input.value = v;
+}
 
 function showError(msg) {
   $("error-box").textContent = "⚠ " + msg;
@@ -274,10 +217,7 @@ function setProgress(step, pct) {
   $("progress-step").textContent = step;
   $("progress-pct").textContent = pct + "%";
   $("progress-fill").style.width = pct + "%";
-
-  const activeIndex = pct < 15 ? 0 : pct < 25 ? 1 : pct < 35 ? 2 :
-    pct < 40 ? 3 : pct < 82 ? 4 : pct < 93 ? 5 : 6;
-
+  const activeIndex = pct < 15 ? 0 : pct < 25 ? 1 : pct < 35 ? 2 : pct < 40 ? 3 : pct < 82 ? 4 : pct < 93 ? 5 : 6;
   $("steps-list").innerHTML = STEP_LABELS.map((label, i) => {
     const cls = i < activeIndex ? "done" : i === activeIndex ? "active" : "";
     return `<div class="step-item ${cls}"><div class="step-dot"></div><span>${label}</span></div>`;
@@ -287,29 +227,30 @@ function setProgress(step, pct) {
 async function startJob() {
   const url = $("url-input").value.trim();
   if (!url) return;
-
+  const payload = { url };
+  if (timeRangeOn) {
+    const start = $("time-start").value.trim();
+    const end   = $("time-end").value.trim();
+    if (start) payload.start_time = start;
+    if (end)   payload.end_time   = end;
+  }
   $("error-box").style.display = "none";
   $("result-wrap").style.display = "none";
   $("progress-wrap").style.display = "block";
   $("btn-go").disabled = true;
   $("btn-go").textContent = "Snapping…";
   setProgress("Starting…", 0);
-
   if (pollTimer) clearInterval(pollTimer);
-
   try {
     const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) { showError(data.detail || "Server error"); return; }
     currentJobId = data.job_id;
     pollTimer = setInterval(pollStatus, 2000);
-  } catch (e) {
-    showError("Could not connect to server. Is it running?");
-  }
+  } catch(e) { showError("Could not connect to server."); }
 }
 
 async function pollStatus() {
@@ -317,25 +258,19 @@ async function pollStatus() {
   try {
     const res = await fetch(`/api/status/${currentJobId}`);
     const job = await res.json();
-
     if (job.status === "processing" || job.status === "pending") {
-      setProgress(job.step, job.pct);
-      return;
+      setProgress(job.step, job.pct); return;
     }
     clearInterval(pollTimer);
-
     if (job.status === "done") {
       $("progress-wrap").style.display = "none";
       $("result-wrap").style.display = "flex";
       $("result-title").textContent = job.filename.replace(/_/g, " ").replace(".pdf", "");
       $("result-meta").textContent = "PDF ready — click to download";
-      $("btn-go").disabled = false;
-      $("btn-go").textContent = "Snap it →";
+      $("btn-go").disabled = false; $("btn-go").textContent = "Snap it →";
       $("btn-dl").onclick = () => { window.location.href = `/api/download/${currentJobId}`; };
-    } else {
-      showError(job.error || "Something went wrong.");
-    }
-  } catch (e) {}
+    } else { showError(job.error || "Something went wrong."); }
+  } catch(e) {}
 }
 
 $("url-input").addEventListener("keydown", e => { if (e.key === "Enter") startJob(); });

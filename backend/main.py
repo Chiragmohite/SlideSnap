@@ -1,6 +1,5 @@
 """
-VidToDoc backend: YouTube transcript -> Groq AI -> PDF
-Falls back to video file upload if transcript unavailable.
+VidToDoc backend: YouTube URL -> slide frames -> Groq vision -> PDF
 """
 from __future__ import annotations
 import asyncio, base64, json, os, re, shutil, subprocess, sys, tempfile, uuid
@@ -79,7 +78,10 @@ def resolve_tool(name: str) -> list[str]:
         _TOOL_CACHE[name] = [found]
         return _TOOL_CACHE[name]
     if name == "yt-dlp":
-        for cmd in ([sys.executable, "-m", "yt_dlp"], ["py", "-3", "-m", "yt_dlp"]):
+        for cmd in (
+            [sys.executable, "-m", "yt_dlp"],
+            ["py", "-3", "-m", "yt_dlp"],
+        ):
             try:
                 proc = subprocess.run([*cmd, "--version"], capture_output=True, timeout=15)
                 if proc.returncode == 0:
@@ -101,7 +103,7 @@ def parse_video_id(url: str) -> str:
     if m: return m.group(1)
     raise HTTPException(status_code=400, detail="Invalid YouTube URL.")
 
-async def fetch_video_title(video_id: str) -> str:
+async def fetch_video_title(url: str, video_id: str) -> str:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             res = await client.get(
@@ -112,139 +114,6 @@ async def fetch_video_title(video_id: str) -> str:
     except: pass
     return video_id
 
-async def fetch_transcript(video_id: str) -> Optional[str]:
-    """Fetch YouTube transcript using youtube-transcript-api."""
-    try:
-        from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
-        loop = asyncio.get_event_loop()
-        def _fetch():
-            try:
-                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-                # Try English first, then any available
-                try:
-                    transcript = transcript_list.find_transcript(['en', 'en-US', 'en-GB', 'en-IN'])
-                except:
-                    transcript = transcript_list.find_generated_transcript(['en', 'en-US', 'en-GB', 'en-IN'])
-                data = transcript.fetch()
-                # Combine all text with timestamps
-                lines = []
-                for entry in data:
-                    text = entry.get('text', '').strip()
-                    if text and text != '[Music]':
-                        lines.append(text)
-                return ' '.join(lines)
-            except (NoTranscriptFound, TranscriptsDisabled):
-                return None
-            except Exception:
-                return None
-        return await loop.run_in_executor(None, _fetch)
-    except ImportError:
-        return None
-
-# ── Groq helpers ──────────────────────────────────────────────────────────────
-
-async def organize_transcript(api_key: str, transcript: str, title: str) -> str:
-    """Use Groq AI to organize raw transcript into study notes."""
-    # Truncate if too long
-    if len(transcript) > 12000:
-        transcript = transcript[:12000] + "..."
-
-    payload = {
-        "model": VISION_MODEL,
-        "messages": [{"role": "user", "content": (
-            f"The following is a transcript from a YouTube lecture titled: '{title}'\n\n"
-            "Your job: Convert this raw transcript into clean, organized study notes.\n"
-            "- Identify and preserve all module/chapter/topic headings\n"
-            "- Extract all questions and their answers\n"
-            "- Keep important definitions, formulas, and concepts\n"
-            "- Group content under proper headings\n"
-            "- Number questions within each section starting from 1\n"
-            "- Remove filler words, repetitions, and non-educational content\n"
-            "- Output only the final clean study notes, no explanation or preamble\n\n"
-            f"TRANSCRIPT:\n{transcript}"
-        )}],
-        "max_tokens": 3000,
-    }
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        res = await client.post(
-            GROQ_URL,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json=payload,
-        )
-    if res.status_code != 200:
-        try: msg = res.json().get("error", {}).get("message", res.text)
-        except: msg = res.text
-        raise HTTPException(status_code=502, detail=f"Groq error: {msg}")
-    return res.json()["choices"][0]["message"]["content"].strip()
-
-async def groq_extract_slide(api_key: str, image_path: Path) -> str:
-    payload = {
-        "model": VISION_MODEL,
-        "messages": [{"role": "user", "content": [
-            {"type": "text", "text": SLIDE_PROMPT},
-            {"type": "image_url", "image_url": {"url": image_to_data_url(image_path)}},
-        ]}],
-        "max_tokens": 1800,
-    }
-    msg = ""
-    for attempt in range(3):
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            res = await client.post(
-                GROQ_URL,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json=payload,
-            )
-        if res.status_code == 200: break
-        try: msg = res.json().get("error", {}).get("message", res.text)
-        except: msg = res.text
-        if res.status_code == 429:
-            await asyncio.sleep(65 if "per day" in msg else 15)
-            continue
-        raise HTTPException(status_code=502, detail=f"Groq API error: {msg}")
-    else:
-        raise HTTPException(status_code=502, detail=f"Groq API error after retries: {msg}")
-    data = res.json()
-    text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
-    text = re.sub(r"(?i)^the image contains the following text[:\s]*", "", (text or "").strip()).strip()
-    return text or "[no text on slide]"
-
-async def consolidate_text(api_key: str, raw_slides: list[tuple[int, str]]) -> str:
-    combined = "\n\n".join(f"[Slide {n}]\n{t}" for n, t in raw_slides)
-    payload = {
-        "model": VISION_MODEL,
-        "messages": [{"role": "user", "content": (
-            "Below is raw text extracted from frames of an educational video. "
-            "Your job: produce ONE clean, deduplicated study document. "
-            "Preserve ALL module/chapter/unit/topic headings exactly as they appear. "
-            "Keep questions under the heading they appeared after. "
-            "Number questions within each section starting from 1. "
-            "Remove watermarks, social media handles, branding, YouTube UI elements. "
-            "Output only the final clean question list -- no explanation, no preamble.\n\n"
-            + combined
-        )}],
-        "max_tokens": 2000,
-    }
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        res = await client.post(
-            GROQ_URL,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json=payload,
-        )
-    if res.status_code != 200:
-        try: msg = res.json().get("error", {}).get("message", res.text)
-        except: msg = res.text
-        raise HTTPException(status_code=502, detail=f"Groq consolidation error: {msg}")
-    return res.json()["choices"][0]["message"]["content"].strip()
-
-# ── Video processing helpers ──────────────────────────────────────────────────
-
-def image_to_data_url(path: Path) -> str:
-    b64 = base64.standard_b64encode(path.read_bytes()).decode("ascii")
-    return f"data:image/jpeg;base64,{b64}"
-
-def skip_slide_text(text: str) -> bool:
-    return text.strip().lower() in ("[no text on slide]", "[no text on slide].", "")
-
 def get_video_duration(video: Path) -> float:
     ffprobe_path = shutil.which("ffprobe") or "ffprobe"
     try:
@@ -254,6 +123,21 @@ def get_video_duration(video: Path) -> float:
             capture_output=True, text=True, timeout=30)
         return float(proc.stdout.strip())
     except: return 600.0
+
+def download_video(url: str, out_dir: Path) -> Path:
+    out_tpl = str(out_dir / "video.%(ext)s")
+    cmd = [
+        *tool_cmd("yt-dlp"), "--no-playlist",
+        "-f", "bv*[height<=720]+ba/b[height<=720]/best[height<=720]",
+        "--merge-output-format", "mp4",
+        "-o", out_tpl, url,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if proc.returncode != 0:
+        raise HTTPException(status_code=502, detail=f"Download failed: {proc.stderr[-400:]}")
+    files = list(out_dir.glob("video.*"))
+    if not files: raise HTTPException(status_code=502, detail="No video file after download.")
+    return files[0]
 
 def extract_frames(video: Path, frames_dir: Path) -> list[Path]:
     scene_pattern = str(frames_dir / "scene_%04d.jpg")
@@ -292,9 +176,69 @@ def dedupe_frames(frame_paths: list[Path]) -> list[Path]:
         kept.append(path)
     return kept[:MAX_SLIDES]
 
-# ── PDF builder ───────────────────────────────────────────────────────────────
+def image_to_data_url(path: Path) -> str:
+    b64 = base64.standard_b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/jpeg;base64,{b64}"
 
-def build_pdf(source: str, title: str, text: str, out_path: Path) -> None:
+async def groq_extract_slide(api_key: str, image_path: Path) -> str:
+    payload = {
+        "model": VISION_MODEL,
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": SLIDE_PROMPT},
+            {"type": "image_url", "image_url": {"url": image_to_data_url(image_path)}},
+        ]}],
+        "max_tokens": 1800,
+    }
+    msg = ""
+    for attempt in range(3):
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            res = await client.post(GROQ_URL,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json=payload)
+        if res.status_code == 200: break
+        try: msg = res.json().get("error", {}).get("message", res.text)
+        except: msg = res.text
+        if res.status_code == 429:
+            await asyncio.sleep(65 if "per day" in msg else 15)
+            continue
+        raise HTTPException(status_code=502, detail=f"Groq API error: {msg}")
+    else:
+        raise HTTPException(status_code=502, detail=f"Groq API error after retries: {msg}")
+    data = res.json()
+    text = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
+    text = re.sub(r"(?i)^the image contains the following text[:\s]*", "", (text or "").strip()).strip()
+    return text or "[no text on slide]"
+
+def skip_slide_text(text: str) -> bool:
+    return text.strip().lower() in ("[no text on slide]", "[no text on slide].", "")
+
+async def consolidate_text(api_key: str, raw_slides: list[tuple[int, str]]) -> str:
+    combined = "\n\n".join(f"[Slide {n}]\n{t}" for n, t in raw_slides)
+    payload = {
+        "model": VISION_MODEL,
+        "messages": [{"role": "user", "content": (
+            "Below is raw text extracted from frames of an educational video. "
+            "Your job: produce ONE clean, deduplicated study document. "
+            "Preserve ALL module/chapter/unit/topic headings exactly as they appear. "
+            "Keep questions under the heading they appeared after. "
+            "Number questions within each section starting from 1. "
+            "Remove watermarks, social media handles, branding, YouTube UI elements. "
+            "Output only the final clean question list -- no explanation, no preamble.\n\n"
+            + combined
+        )}],
+        "max_tokens": 2000,
+    }
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        res = await client.post(GROQ_URL,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json=payload)
+    if res.status_code != 200:
+        try: msg = res.json().get("error", {}).get("message", res.text)
+        except: msg = res.text
+        raise HTTPException(status_code=502, detail=f"Groq consolidation error: {msg}")
+    return res.json()["choices"][0]["message"]["content"].strip()
+
+def build_pdf(url: str, title: str, text: str, out_path: Path) -> None:
     styles = getSampleStyleSheet()
     title_style   = ParagraphStyle("T", parent=styles["Heading1"], fontSize=16, spaceAfter=4)
     meta_style    = ParagraphStyle("M", parent=styles["Normal"],   fontSize=9,  textColor="#555555", spaceAfter=14)
@@ -304,7 +248,7 @@ def build_pdf(source: str, title: str, text: str, out_path: Path) -> None:
     doc = SimpleDocTemplate(str(out_path), pagesize=A4,
         leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm,
         title=title, author="SlideSnap", subject="Study Notes")
-    story = [Paragraph(esc(title), title_style), Paragraph(esc(f"Source: {source}"), meta_style), Spacer(1, 6)]
+    story = [Paragraph(esc(title), title_style), Paragraph(esc(f"Source: {url}"), meta_style), Spacer(1, 6)]
     for line in text.splitlines():
         s = line.strip()
         if not s: story.append(Spacer(1, 4))
@@ -313,37 +257,55 @@ def build_pdf(source: str, title: str, text: str, out_path: Path) -> None:
         else: story.append(Paragraph(esc(s), body_style))
     doc.build(story)
 
-def finalize_job(job_id: str, title: str, source: str, clean_text: str):
-    out_pdf = JOBS_DIR / f"{job_id}_out.pdf"
+# ── Core processing ───────────────────────────────────────────────────────────
+
+async def process_video(job_id: str, video_path: Path, title: str, source: str, api_key: str):
+    job_set(job_id, step="Extracting frames...", pct=25)
+    frames_dir = video_path.parent / "frames"
+    frames_dir.mkdir(exist_ok=True)
+    raw_frames = extract_frames(video_path, frames_dir)
+    if not raw_frames: raise HTTPException(status_code=502, detail="No frames extracted.")
+
+    job_set(job_id, step="Removing duplicate frames...", pct=35)
+    unique_frames = dedupe_frames(raw_frames)
+    if not unique_frames: raise HTTPException(status_code=502, detail="No usable frames.")
+
+    total = len(unique_frames)
+    slides, slide_num = [], 0
+    for i, frame_path in enumerate(unique_frames):
+        pct = 35 + int((i / total) * 45)
+        job_set(job_id, step=f"Reading frame {i+1} of {total}...", pct=pct)
+        text = await groq_extract_slide(api_key, frame_path)
+        if not skip_slide_text(text):
+            slide_num += 1
+            slides.append((slide_num, text))
+        await asyncio.sleep(8)
+
+    if not slides: raise HTTPException(status_code=502, detail="No text found in video frames.")
+
+    job_set(job_id, step="Cleaning and organising content...", pct=82)
+    await asyncio.sleep(8)
+    clean_text = await consolidate_text(api_key, slides)
+
+    job_set(job_id, step="Building PDF...", pct=93)
+    out_pdf = video_path.parent / "output.pdf"
     build_pdf(source, title, clean_text, out_pdf)
     pdf_bytes = out_pdf.read_bytes()
-    out_pdf.unlink(missing_ok=True)
+
     safe_title = re.sub(r"[^a-zA-Z0-9 _-]", "", title).strip().replace(" ", "_")[:60]
     filename = f"{safe_title or 'notes'}.pdf"
     job_set(job_id, status="done", step="Done!", pct=100, pdf_bytes=pdf_bytes, filename=filename)
 
-# ── Job runners ───────────────────────────────────────────────────────────────
-
-async def run_job_url(job_id: str, url: str, api_key: str):
+async def run_job(job_id: str, url: str, api_key: str):
     try:
         job_set(job_id, status="processing", step="Fetching video info...", pct=5)
         video_id = parse_video_id(url)
-        title    = await fetch_video_title(video_id)
-
-        # Try transcript first
-        job_set(job_id, step="Looking for transcript...", pct=15)
-        transcript = await fetch_transcript(video_id)
-
-        if transcript:
-            job_set(job_id, step="Transcript found! Organising with AI...", pct=40)
-            clean_text = await organize_transcript(api_key, transcript, title)
-            job_set(job_id, step="Building PDF...", pct=90)
-            finalize_job(job_id, title, url, clean_text)
-        else:
-            # No transcript — tell user to upload
-            job_set(job_id, status="error", step="Failed",
-                error="No transcript found for this video. Please use the 📁 Upload Video tab instead — download the video and upload it directly.")
-
+        title    = await fetch_video_title(url, video_id)
+        job_set(job_id, step=f"Downloading: {title}...", pct=10)
+        with tempfile.TemporaryDirectory(prefix="vidtodoc_") as tmp:
+            work = Path(tmp)
+            video_path = download_video(url, work)
+            await process_video(job_id, video_path, title, url, api_key)
     except HTTPException as e:
         job_set(job_id, status="error", step="Failed", error=e.detail)
     except Exception as e:
@@ -351,42 +313,9 @@ async def run_job_url(job_id: str, url: str, api_key: str):
 
 async def run_job_upload(job_id: str, video_path: Path, orig_filename: str, api_key: str):
     try:
-        job_set(job_id, status="processing", step="Processing uploaded video...", pct=10)
+        job_set(job_id, status="processing", step="Processing uploaded video...", pct=15)
         title = Path(orig_filename).stem.replace("_", " ").replace("-", " ")
-
-        job_set(job_id, step="Extracting frames...", pct=20)
-        frames_dir = video_path.parent / "frames"
-        frames_dir.mkdir(exist_ok=True)
-        raw_frames = extract_frames(video_path, frames_dir)
-        if not raw_frames:
-            raise HTTPException(status_code=502, detail="No frames extracted.")
-
-        job_set(job_id, step="Removing duplicate frames...", pct=30)
-        unique_frames = dedupe_frames(raw_frames)
-        if not unique_frames:
-            raise HTTPException(status_code=502, detail="No usable frames.")
-
-        total = len(unique_frames)
-        slides, slide_num = [], 0
-        for i, frame_path in enumerate(unique_frames):
-            pct = 30 + int((i / total) * 50)
-            job_set(job_id, step=f"Reading frame {i+1} of {total}...", pct=pct)
-            text = await groq_extract_slide(api_key, frame_path)
-            if not skip_slide_text(text):
-                slide_num += 1
-                slides.append((slide_num, text))
-            await asyncio.sleep(8)
-
-        if not slides:
-            raise HTTPException(status_code=502, detail="No text found in video frames.")
-
-        job_set(job_id, step="Cleaning and organising content...", pct=82)
-        await asyncio.sleep(8)
-        clean_text = await consolidate_text(api_key, slides)
-
-        job_set(job_id, step="Building PDF...", pct=93)
-        finalize_job(job_id, title, f"Uploaded: {orig_filename}", clean_text)
-
+        await process_video(job_id, video_path, title, f"Uploaded: {orig_filename}", api_key)
     except HTTPException as e:
         job_set(job_id, status="error", step="Failed", error=e.detail)
     except Exception as e:
@@ -412,9 +341,11 @@ async def health():
 async def generate(req: GenerateRequest):
     api_key = os.environ.get("GROQ_API_KEY", "").strip()
     if not api_key: raise HTTPException(status_code=500, detail="GROQ_API_KEY not set.")
+    resolve_tool("ffmpeg")
+    resolve_tool("yt-dlp")
     job_id = str(uuid.uuid4())
     job_set(job_id, status="pending", step="Starting...", pct=0, filename=None, error=None)
-    asyncio.create_task(run_job_url(job_id, req.url.strip(), api_key))
+    asyncio.create_task(run_job(job_id, req.url.strip(), api_key))
     return {"job_id": job_id}
 
 @app.post("/api/upload")

@@ -31,7 +31,7 @@ SlideSnap extracts slide frames from YouTube videos, reads the text using vision
 
 ## 🖥️ Screenshot
 
-![SlideSnap UI](https://raw.githubusercontent.com/Chiragmohite/SlideSnap/main/Screenshot.png.png)
+![SlideSnap UI](https://raw.githubusercontent.com/Chiragmohite/SlideSnap/main/Screenshot.png)
 
 ---
 

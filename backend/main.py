@@ -220,10 +220,11 @@ async def consolidate_text(api_key: str, raw_slides: list[tuple[int, str]]) -> s
             "Below is raw text extracted from frames of an educational video. "
             "Your job: produce ONE clean, deduplicated study document. "
             "Preserve ALL module/chapter/unit/topic headings exactly as they appear. "
-            "Keep questions under the heading they appeared after. "
+            "Keep questions STRICTLY under the module/section heading they appeared after -- NEVER merge two modules. "
+            "If a module heading appears but has no questions, still include the heading and write '(No questions found)'. "
             "Number questions within each section starting from 1. "
             "Remove watermarks, social media handles, branding, YouTube UI elements. "
-            "Output only the final clean question list -- no explanation, no preamble.\n\n"
+            "Output only the final clean study notes -- no explanation, no preamble.\n\n"
             + combined
         )}],
         "max_tokens": 2000,

@@ -27,7 +27,7 @@ MAX_SLIDES   = 50
 PHASH_THRESHOLD = 10
 MAX_UPLOAD_MB = 500
 
-JOBS_DIR = Path("/tmp/slidesnap_jobs")
+JOBS_DIR = Path(tempfile.gettempdir()) / "slidesnap_jobs"
 JOBS_DIR.mkdir(exist_ok=True)
 
 SLIDE_PROMPT = (

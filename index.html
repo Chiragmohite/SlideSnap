@@ -44,6 +44,13 @@
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 36px; width: 100%; max-width: 620px; }
 
+  .mode-tabs { display: flex; gap: 0; margin-bottom: 24px; background: var(--bg); border-radius: 10px; padding: 4px; }
+  .mode-tab { flex: 1; padding: 10px; text-align: center; font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer; border-radius: 8px; transition: all .2s; }
+  .mode-tab.active { background: var(--accent); color: #fff; }
+
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+
   .input-label { font-size: 18px; font-weight: 600; color: var(--muted); margin-bottom: 12px; display: block; }
   .input-row { display: flex; gap: 10px; }
 
@@ -70,6 +77,25 @@
   .time-sep { color: var(--muted); font-size: 20px; margin-top: 20px; }
   .time-hint { font-size: 13px; color: var(--muted); margin-top: 10px; padding: 10px 14px; background: rgba(108,99,255,0.08); border: 1px solid rgba(108,99,255,0.2); border-radius: 8px; line-height: 1.5; }
   .time-hint strong { color: var(--accent2); }
+
+  /* Upload area */
+  .upload-area {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 40px 20px; text-align: center; cursor: pointer;
+    transition: all .2s; position: relative;
+  }
+  .upload-area:hover { border-color: var(--accent); background: rgba(108,99,255,0.05); }
+  .upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 40px; margin-bottom: 12px; }
+  .upload-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .upload-sub { font-size: 14px; color: var(--muted); }
+  .upload-selected { margin-top: 12px; padding: 10px 14px; background: rgba(108,99,255,0.1); border: 1px solid rgba(108,99,255,0.3); border-radius: 8px; font-size: 14px; color: var(--accent2); display: none; }
+  .upload-selected.visible { display: block; }
+  .btn-full { width: 100%; margin-top: 16px; }
+  .upload-prog { margin-top: 10px; display: none; }
+  .upload-prog-bg { height: 4px; background: var(--border); border-radius: 100px; overflow: hidden; }
+  .upload-prog-fill { height: 100%; background: var(--accent); border-radius: 100px; width: 0%; transition: width .1s; }
+  .upload-prog-label { font-size: 13px; color: var(--muted); margin-top: 6px; }
 
   .btn { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 15px 26px; font-size: 17px; font-weight: 700; cursor: pointer; transition: opacity .2s, transform .1s; white-space: nowrap; }
   .btn:hover { opacity: .88; }
@@ -120,32 +146,59 @@
   <div class="logo-icon">📸</div>
   <span class="logo-text">SlideSnap</span>
 </div>
-<p class="tagline">Snap the slides from any YouTube lecture — get a clean, downloadable study PDF</p>
+<p class="tagline">Snap the slides from any lecture — get a clean, downloadable study PDF</p>
 
 <div class="card">
-  <label class="input-label" for="url-input">YouTube Video URL</label>
-  <div class="input-row">
-    <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=..." />
-    <button class="btn" id="btn-go" onclick="startJob()">Snap it →</button>
+
+  <!-- Mode tabs -->
+  <div class="mode-tabs">
+    <div class="mode-tab active" id="tab-url" onclick="switchMode('url')">🔗 YouTube URL</div>
+    <div class="mode-tab" id="tab-file" onclick="switchMode('file')">📁 Upload Video</div>
   </div>
 
-  <div class="time-range-toggle" id="time-toggle" onclick="toggleTimeRange()">
-    <div class="toggle-track"></div>
-    <span class="toggle-label">Specific time range <span>(for long videos)</span></span>
-  </div>
-  <div class="time-inputs" id="time-inputs">
-    <div class="time-input-wrap">
-      <span class="time-sublabel">Start time</span>
-      <input type="text" id="time-start" placeholder="00:00:00" maxlength="8" oninput="formatTime(this)" />
+  <!-- URL panel -->
+  <div class="mode-panel active" id="panel-url">
+    <label class="input-label" for="url-input">YouTube Video URL</label>
+    <div class="input-row">
+      <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=..." />
+      <button class="btn" id="btn-go" onclick="startJob()">Snap it →</button>
     </div>
-    <div class="time-sep">→</div>
-    <div class="time-input-wrap">
-      <span class="time-sublabel">End time</span>
-      <input type="text" id="time-end" placeholder="00:30:00" maxlength="8" oninput="formatTime(this)" />
+
+    <div class="time-range-toggle" id="time-toggle" onclick="toggleTimeRange()">
+      <div class="toggle-track"></div>
+      <span class="toggle-label">Specific time range <span>(for long videos)</span></span>
+    </div>
+    <div class="time-inputs" id="time-inputs">
+      <div class="time-input-wrap">
+        <span class="time-sublabel">Start time</span>
+        <input type="text" id="time-start" placeholder="00:00:00" maxlength="8" oninput="formatTime(this)" />
+      </div>
+      <div class="time-sep">→</div>
+      <div class="time-input-wrap">
+        <span class="time-sublabel">End time</span>
+        <input type="text" id="time-end" placeholder="00:30:00" maxlength="8" oninput="formatTime(this)" />
+      </div>
+    </div>
+    <div class="time-hint" id="time-hint" style="display:none;">
+      💡 <strong>Tip:</strong> Use chapter timestamps from the video description. Max 45 min recommended.
     </div>
   </div>
-  <div class="time-hint" id="time-hint" style="display:none;">
-    💡 <strong>Tip:</strong> Use chapter timestamps from the video description. Max 45 min recommended.
+
+  <!-- Upload panel -->
+  <div class="mode-panel" id="panel-file">
+    <label class="input-label">Upload Video File</label>
+    <div class="upload-area" id="upload-area">
+      <input type="file" id="file-input" accept="video/*,.mp4,.mkv,.webm,.avi" onchange="onFileSelected(this)" />
+      <div class="upload-icon">🎬</div>
+      <div class="upload-title">Drop your video here or click to browse</div>
+      <div class="upload-sub">MP4, MKV, WebM — max 500MB</div>
+    </div>
+    <div class="upload-selected" id="upload-selected"></div>
+    <div class="upload-prog" id="upload-prog">
+      <div class="upload-prog-bg"><div class="upload-prog-fill" id="upload-prog-fill"></div></div>
+      <div class="upload-prog-label" id="upload-prog-label">Uploading...</div>
+    </div>
+    <button class="btn btn-full" id="btn-upload" onclick="startUpload()" disabled>Snap it →</button>
   </div>
 
   <div class="pills">
@@ -179,7 +232,7 @@
 <div class="how">
   <div class="how-title">How it works</div>
   <div class="how-grid">
-    <div class="how-item"><div class="how-num">1</div><div class="how-desc">Paste any YouTube educational video link</div></div>
+    <div class="how-item"><div class="how-num">1</div><div class="how-desc">Paste a YouTube link or upload a video file</div></div>
     <div class="how-item"><div class="how-num">2</div><div class="how-desc">AI snaps every slide and reads the text</div></div>
     <div class="how-item"><div class="how-num">3</div><div class="how-desc">Download a clean, organised PDF in minutes</div></div>
   </div>
@@ -187,8 +240,18 @@
 
 <script>
 const STEP_LABELS = ["Fetching video info","Downloading video","Extracting frames","Removing duplicates","Reading slides with AI","Organising content","Building PDF"];
-let pollTimer = null, currentJobId = null, timeRangeOn = false;
+let pollTimer = null, currentJobId = null, timeRangeOn = false, selectedFile = null;
 function $(id) { return document.getElementById(id); }
+
+function switchMode(mode) {
+  $("tab-url").classList.toggle("active", mode === "url");
+  $("tab-file").classList.toggle("active", mode === "file");
+  $("panel-url").classList.toggle("active", mode === "url");
+  $("panel-file").classList.toggle("active", mode === "file");
+  $("error-box").style.display = "none";
+  $("result-wrap").style.display = "none";
+  $("progress-wrap").style.display = "none";
+}
 
 function toggleTimeRange() {
   timeRangeOn = !timeRangeOn;
@@ -205,12 +268,22 @@ function formatTime(input) {
   input.value = v;
 }
 
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  selectedFile = file;
+  const mb = (file.size / 1024 / 1024).toFixed(1);
+  $("upload-selected").textContent = `📄 ${file.name} (${mb} MB)`;
+  $("upload-selected").classList.add("visible");
+  $("btn-upload").disabled = false;
+}
+
 function showError(msg) {
   $("error-box").textContent = "⚠ " + msg;
   $("error-box").style.display = "block";
   $("progress-wrap").style.display = "none";
-  $("btn-go").disabled = false;
-  $("btn-go").textContent = "Snap it →";
+  if ($("btn-go")) { $("btn-go").disabled = false; $("btn-go").textContent = "Snap it →"; }
+  $("btn-upload").disabled = false; $("btn-upload").textContent = "Snap it →";
 }
 
 function setProgress(step, pct) {
@@ -224,6 +297,16 @@ function setProgress(step, pct) {
   }).join("");
 }
 
+function startPolling(job_id) {
+  currentJobId = job_id;
+  $("error-box").style.display = "none";
+  $("result-wrap").style.display = "none";
+  $("progress-wrap").style.display = "block";
+  setProgress("Starting…", 0);
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollStatus, 2000);
+}
+
 async function startJob() {
   const url = $("url-input").value.trim();
   if (!url) return;
@@ -234,13 +317,8 @@ async function startJob() {
     if (start) payload.start_time = start;
     if (end)   payload.end_time   = end;
   }
-  $("error-box").style.display = "none";
-  $("result-wrap").style.display = "none";
-  $("progress-wrap").style.display = "block";
   $("btn-go").disabled = true;
   $("btn-go").textContent = "Snapping…";
-  setProgress("Starting…", 0);
-  if (pollTimer) clearInterval(pollTimer);
   try {
     const res = await fetch("/api/generate", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -248,9 +326,46 @@ async function startJob() {
     });
     const data = await res.json();
     if (!res.ok) { showError(data.detail || "Server error"); return; }
-    currentJobId = data.job_id;
-    pollTimer = setInterval(pollStatus, 2000);
+    startPolling(data.job_id);
   } catch(e) { showError("Could not connect to server."); }
+}
+
+async function startUpload() {
+  if (!selectedFile) return;
+  $("btn-upload").disabled = true;
+  $("btn-upload").textContent = "Uploading…";
+  $("error-box").style.display = "none";
+  $("upload-prog").style.display = "block";
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+
+  try {
+    const job_id = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload");
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+          const pct = Math.round(e.loaded / e.total * 100);
+          $("upload-prog-fill").style.width = pct + "%";
+          $("upload-prog-label").textContent = `Uploading… ${pct}%`;
+        }
+      };
+      xhr.onload = () => {
+        if (xhr.status === 200) resolve(JSON.parse(xhr.responseText).job_id);
+        else { try { reject(JSON.parse(xhr.responseText).detail); } catch { reject("Upload failed"); } }
+      };
+      xhr.onerror = () => reject("Upload failed");
+      xhr.send(formData);
+    });
+    $("upload-prog").style.display = "none";
+    startPolling(job_id);
+  } catch(e) {
+    $("upload-prog").style.display = "none";
+    showError(typeof e === "string" ? e : "Upload failed.");
+    $("btn-upload").disabled = false;
+    $("btn-upload").textContent = "Snap it →";
+  }
 }
 
 async function pollStatus() {
@@ -267,7 +382,8 @@ async function pollStatus() {
       $("result-wrap").style.display = "flex";
       $("result-title").textContent = job.filename.replace(/_/g, " ").replace(".pdf", "");
       $("result-meta").textContent = "PDF ready — click to download";
-      $("btn-go").disabled = false; $("btn-go").textContent = "Snap it →";
+      if ($("btn-go")) { $("btn-go").disabled = false; $("btn-go").textContent = "Snap it →"; }
+      $("btn-upload").disabled = false; $("btn-upload").textContent = "Snap it →";
       $("btn-dl").onclick = () => { window.location.href = `/api/download/${currentJobId}`; };
     } else { showError(job.error || "Something went wrong."); }
   } catch(e) {}

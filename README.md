@@ -25,7 +25,7 @@ SlideSnap extracts slide frames from YouTube videos, reads the text using vision
 - 🗂️ Auto-organizes content by Module / Chapter / Topic
 - 🔁 Removes duplicate frames from slow-scrolling videos
 - 📥 Clean downloadable PDF with proper headings and numbering
-- 🌐 Works for any subject — engineering, science, history, coding, law, medicine
+- 🌐 Works for any subject — engineering, science, history, coding, law, medicines
 
 ---
 

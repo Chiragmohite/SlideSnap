@@ -150,3 +150,9 @@ Get a free key at [console.groq.com](https://console.groq.com)
 ## 🙋 Author
 
 Made by [Chirag Mohite](https://github.com/Chiragmohite)
+
+---
+
+Updated README for GitHub achievement.
+
+
